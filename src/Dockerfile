@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/team-me
 
 FROM ${RUNTIME_IMAGE}
 # su-exec 供入口脚本从 root 降权到 memory；RUNTIME_IMAGE 必须是带 apk 的 Alpine 系镜像。
-RUN apk add --no-cache su-exec \
+RUN apk add --no-cache su-exec tzdata \
     && adduser -D -u 10001 memory \
     && mkdir -p /data \
     && chown memory:memory /data

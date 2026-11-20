@@ -524,6 +524,10 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 			return nil, ve
 		}
 	}
+	// TASKS.md 由服务端补「推进者（自报）」与「更新时间」，不让模型手填时间。
+	if rel == "TASKS.md" {
+		newContent = []byte(normalizeTasks(string(newContent), req.Session, s.now()))
+	}
 
 	// 只有覆盖写才留快照；append 不改旧内容。
 	if exists && req.Mode == "replace" {
@@ -531,7 +535,8 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 			return nil, errf("INTERNAL", 500, "写历史快照失败", err.Error())
 		}
 	}
-	if req.Mode == "append" {
+	// append 的快路径要求旧内容前缀不变；TASKS.md 会被规整（表头升级），必须整篇重写。
+	if req.Mode == "append" && rel != "TASKS.md" {
 		if err := s.st.Append(slug, rel, newContent[len(old):]); err != nil {
 			return nil, errf("INTERNAL", 500, "追加失败", err.Error())
 		}

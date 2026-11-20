@@ -74,7 +74,7 @@ MCP 客户端（Claude Code / Cursor / VS Code / Trae …）
 cd src
 docker compose up -d
 curl -s http://127.0.0.1:8080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.1"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.2"}
 ```
 
 `docker-compose.yml` 默认从本目录构建镜像，并把 `./data` 挂到容器的 `/data`。镜像未发布前直接 `docker compose up -d --build` 即可。
@@ -84,7 +84,7 @@ Gitee 不提供容器镜像仓库，预构建镜像计划发布在 GitHub（`ghc
 ```yaml
 services:
   memory:
-    image: ghcr.io/try520/team-memory:0.1.1
+    image: ghcr.io/try520/team-memory:0.1.2
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -137,7 +137,7 @@ services:
 
 ## 编辑器扩展
 
-扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前服务端与插件版本均为 `0.1.1`：
+扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.1`、服务端 `0.1.2`（插件可连 `0.1.1+`）：
 
 ```powershell
 code --install-extension .\team-memory-<version>.vsix

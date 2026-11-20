@@ -2,7 +2,7 @@
 
 在编辑器里浏览、编辑团队研发记忆服务（team-memory）中的项目记忆：切换项目、看 RULE 索引、按主题/journal 浏览、直接改文件保存回服务、查看索引警告并执行 reindex。
 
-> 版本对应：插件 `0.1.1` 对应服务端 `0.1.1`。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
+> 版本对应：插件 `0.1.1` 可连服务端 `0.1.1+`（当前服务端 `0.1.2`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
 
 ## 安装
 
@@ -137,7 +137,7 @@ code --install-extension .\team-memory-0.1.1.vsix
 ```yaml
 services:
   memory:
-    image: ghcr.io/try520/team-memory:0.1.1
+    image: ghcr.io/try520/team-memory:0.1.2
     container_name: team-memory
     restart: unless-stopped
     ports:

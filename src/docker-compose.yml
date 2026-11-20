@@ -2,7 +2,7 @@ services:
   memory:
     build: .
     # 本地构建即可（docker compose up -d --build）；预构建镜像计划发布在 GitHub ghcr.io/try520/team-memory
-    image: ghcr.io/try520/team-memory:0.1.1
+    image: ghcr.io/try520/team-memory:0.1.2
     container_name: team-memory
     restart: unless-stopped
     ports:
