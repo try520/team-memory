@@ -68,6 +68,44 @@ MCP 客户端（Claude Code / Cursor / VS Code / Trae …）
 - 插件说明：[vscode-extension/README.md](vscode-extension/README.md)
 - 客户端「开场读、结束写」提示词：[client-rule-prompt.md](docs/design/client-rule-prompt.md)
 
+## 数据目录（`data/`）
+
+容器内挂到 `/data`。以下是一个真实实例的现状（`kms` 为示例 slug）：
+
+```
+data/
+├── .pid                          服务进程号（单实例锁）
+├── _service/RULES.md             服务级规则，对所有项目生效
+├── skills/                       全局技能根目录，启动时创建，初始为空
+│   └── <name>/SKILL.md           提审通过后的全局技能
+└── projects/<slug>/
+    ├── RULE.md                   项目索引表（模型第一眼读的）
+    ├── TASKS.md                   任务表（五列）
+    ├── topics/*.md               主题文档（知识正文）
+    ├── journal/YYYY-MM/*.md      会话日志
+    ├── journal/YYYY-MM.INDEX.md  当月日志索引
+    └── .history/<相对路径>/<时间>.md  旧版本快照
+```
+
+| 路径 | 谁写入 / 何时产生 | 模型怎么用 | 手改或删除的后果 |
+|---|---|---|---|
+| `_service/RULES.md` | 服务首次启动时由 `EnsureServiceLayout` 生成，之后只由人工维护 | `memory_get_rules` 以 `service_rule` 返回全文 | MCP 不可写（不在路径白名单）。手改后会话需重新 `get_rules`；删除会在下次启动重建默认内容，原内容丢失 |
+| `skills/` | 启动时创建，初始为空 | 不直接读取，只通过 `get_rules.global_skills` 出现 | 删掉会重启重建，无副作用 |
+| `skills/<name>/SKILL.md` | `skill_promote` 的 `approve` 从项目技能复制而来 | `get_rules.global_skills` 列出；`memory_read` 读 `@global/skills/<name>/SKILL.md` | MCP 只读；要改先在项目里改再重新提审。删除即失去该全局技能（项目内副本仍在） |
+| `projects/<slug>/RULE.md` | 项目首次被访问时自动生成；新建主题时自动插索引行，`reindex` 补漏 | 每次 `get_rules` 返回全文与 `warnings` | 手改会让旧 session 失效（`RULE_CHANGED`），需重新 `get_rules`；索引写错在下次 `get_rules` 报 `missing_in_index` / `missing_file` / `index_too_large` / `row_too_long` |
+| `TASKS.md` | 项目首次访问时生成；表格行由 `memory_write` 写入 | 通过 `memory_read` 读取；`get_rules` 的文件清单里列出 | 写表格时服务端自动补「推进者（自报）」与「更新时间」，手改后同样要重新 `get_rules` 才能写 |
+| `topics/*.md` | `memory_write`（新建必须带索引行）或 `memory_import` | `memory_read` 按索引「适用场景」挑选阅读 | `replace` 前自动快照到 `.history`；直接删除会留下索引行，下次 `get_rules` 报 `missing_file` |
+| `journal/YYYY-MM/<label>-<hhmm>.md` | 模型收尾时 `memory_write` 写入 | 不在 `get_rules` 正文里，只在当月索引中出现 | 可直接删除，索引行不会自动清理；不影响主题文档 |
+| `journal/YYYY-MM.INDEX.md` | 写 journal 时由服务端自动追加一行 | `get_rules` 返回当月与上月的索引文件清单，模型按需 `memory_read` | 手改不会立刻报错，但会与日志文件不一致；没有强校验 |
+| `.history/<相对路径>/<时间>.md` | 任何 `replace` 或 `import(mode=replace)` 覆盖前自动生成 | `memory_read` 传 `rev` 读取旧版本 | 每个文件只保留最近 50 份，自动清理；删掉只丢历史，不影响当前内容 |
+| `.pid` | 启动时写入进程号（容器内为 `1`），退出时删除 | 模型用不到 | 用作单实例锁。运行中删除可能导致同一数据目录被启动第二个实例，不要删 |
+
+**自动维护 vs 人工编辑**
+
+- 服务端自动维护：`RULE.md` 的索引行、`journal/*.INDEX.md`、`.history/`、`.pid`、`skills/` 目录本身、`TASKS.md` 的「推进者/更新时间」两列。
+- 鼓励人工编辑：`_service/RULES.md`、`topics/*.md` 正文、`TASKS.md` 的「任务/状态/下一步」、项目 `RULE.md` 里索引行的「适用场景」。
+- 直接改磁盘文件不会触发写入校验，也不会更新 session 的规则哈希；改动只在**下一次 `get_rules`** 被感知，索引问题也到那时才以 `warnings` 形式报出。
+
 ## 快速开始（Docker）
 
 ```bash
