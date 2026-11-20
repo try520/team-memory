@@ -137,7 +137,7 @@ code --install-extension .\team-memory-0.1.1.vsix
 ```yaml
 services:
   memory:
-    image: ghcr.io/try520/team-memory:0.1.2
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.2
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -152,7 +152,9 @@ services:
 
 镜像自带 healthcheck（每 30 秒请求一次 `/healthz`），compose 里不用重复写。宿主机端口改 `ports` 左边即可，容器内始终是 `8080`；卷右侧和 `DATA_DIR` 必须都是 `/data`。
 
-生产环境建议固定 digest（`docker image inspect <image> --format '{{index .RepoDigests 0}}'` 可查），例如 `image: ghcr.io/try520/team-memory@sha256:<digest>`。
+镜像已公开、可匿名拉取；也可以在本仓库 `src/` 下 `docker compose up -d --build` 本地构建。
+
+生产环境建议固定 digest（`docker image inspect <image> --format '{{index .RepoDigests 0}}'` 可查），例如 `image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory@sha256:<digest>`。
 
 ### 数据目录与权限
 

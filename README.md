@@ -77,14 +77,14 @@ curl -s http://127.0.0.1:8080/healthz
 # {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.2"}
 ```
 
-`docker-compose.yml` 默认从本目录构建镜像，并把 `./data` 挂到容器的 `/data`。镜像未发布前直接 `docker compose up -d --build` 即可。
+`docker-compose.yml` 默认从本目录构建镜像，并把 `./data` 挂到容器的 `/data`。镜像已公开发布、可匿名拉取，也可 `docker compose up -d --build` 本地构建。
 
-Gitee 不提供容器镜像仓库，预构建镜像计划发布在 GitHub（`ghcr.io/try520/team-memory`），发布后可这样引用：
+预构建镜像在阿里云容器镜像服务（公开，无需登录）：
 
 ```yaml
 services:
   memory:
-    image: ghcr.io/try520/team-memory:0.1.2
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.2
     container_name: team-memory
     restart: unless-stopped
     ports:
