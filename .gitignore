@@ -1,0 +1,26 @@
+# 服务端运行数据（DATA_DIR）
+data/
+**/data/
+*.pid
+**/.history/
+
+# Go 构建产物
+bin/
+**/bin/
+*.exe
+*.test
+*.out
+
+# 编辑器扩展依赖与产物
+node_modules/
+vscode-extension/out/
+*.vsix
+*.tsbuildinfo
+
+# 临时文件、日志与本地配置
+.screenshots/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db

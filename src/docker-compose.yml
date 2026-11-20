@@ -1,0 +1,16 @@
+services:
+  memory:
+    build: .
+    # 本地构建即可（docker compose up -d --build）；预构建镜像计划发布在 GitHub ghcr.io/try520/team-memory
+    image: ghcr.io/try520/team-memory:0.1.1
+    container_name: team-memory
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DATA_DIR: /data
+      PORT: "8080"
+      TZ: Asia/Shanghai
+    volumes:
+      # 宿主机目录挂进去即可；备份直接打包这个目录。
+      - ./data:/data

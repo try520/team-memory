@@ -1,0 +1,180 @@
+{
+  "name": "team-memory",
+  "displayName": "团队记忆",
+  "description": "浏览与编辑团队研发记忆服务（team-memory）中的项目记忆：项目切换、文件树、索引警告、编辑保存。",
+  "version": "0.1.1",
+  "publisher": "try520",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/tianling/team-memory.git"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "memory",
+    "mcp",
+    "knowledge",
+    "team"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "teamMemory",
+          "title": "团队记忆",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "teamMemory": [
+        {
+          "id": "teamMemory.view",
+          "name": "项目记忆"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "teamMemory.refresh",
+        "title": "刷新",
+        "category": "团队记忆",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "teamMemory.connect",
+        "title": "连接服务",
+        "category": "团队记忆",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "teamMemory.pickProject",
+        "title": "切换项目",
+        "category": "团队记忆",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "teamMemory.newTopic",
+        "title": "新建主题",
+        "category": "团队记忆",
+        "icon": "$(add)"
+      },
+      {
+        "command": "teamMemory.appendJournal",
+        "title": "写 journal",
+        "category": "团队记忆",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "teamMemory.appendTask",
+        "title": "添加任务",
+        "category": "团队记忆",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "teamMemory.reindex",
+        "title": "补齐索引行（reindex）",
+        "category": "团队记忆",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "teamMemory.showWarnings",
+        "title": "查看索引警告",
+        "category": "团队记忆",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "teamMemory.showServiceRules",
+        "title": "查看服务级规则",
+        "category": "团队记忆",
+        "icon": "$(law)"
+      },
+      {
+        "command": "teamMemory.configure",
+        "title": "配置服务地址",
+        "category": "团队记忆",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "teamMemory.pickProject",
+          "when": "view == teamMemory.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "teamMemory.refresh",
+          "when": "view == teamMemory.view",
+          "group": "navigation@2"
+        },
+        {
+          "command": "teamMemory.newTopic",
+          "when": "view == teamMemory.view",
+          "group": "navigation@3"
+        },
+        {
+          "command": "teamMemory.appendJournal",
+          "when": "view == teamMemory.view",
+          "group": "navigation@4"
+        },
+        {
+          "command": "teamMemory.reindex",
+          "when": "view == teamMemory.view",
+          "group": "more@1"
+        },
+        {
+          "command": "teamMemory.showWarnings",
+          "when": "view == teamMemory.view",
+          "group": "more@2"
+        },
+        {
+          "command": "teamMemory.showServiceRules",
+          "when": "view == teamMemory.view",
+          "group": "more@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "团队记忆",
+      "properties": {
+        "teamMemory.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8080",
+          "description": "记忆服务地址，例如 http://<your-server>:8080（不要带 /mcp）。"
+        },
+        "teamMemory.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "启动时自动连接并读取索引。"
+        },
+        "teamMemory.requestTimeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "description": "单次请求超时（毫秒）。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}
