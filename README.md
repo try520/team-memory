@@ -52,7 +52,7 @@
 ```yaml
 services:
   memory:
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.7
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.8
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -71,7 +71,7 @@ services:
 docker compose up -d
 docker ps                       # STATUS 变成 healthy 即正常
 curl -s http://127.0.0.1:8080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.7"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.8"}
 ```
 
 几点说明：
@@ -206,7 +206,7 @@ qodercli mcp add -s project -t http team-memory-<project> \
 
 ### 第四步：添加客户端插件
 
-插件是标准 `.vsix`，VS Code 与 Trae 都能装。当前插件 `0.1.8`，可连服务端 `0.1.1+`（当前服务端 `0.1.7`）。
+插件是标准 `.vsix`，VS Code 与 Trae 都能装。当前插件 `0.1.8`，可连服务端 `0.1.1+`（当前服务端 `0.1.8`）。
 
 安装：
 
@@ -357,7 +357,7 @@ data/
 | `_service/RULES.md` | 服务首次启动时生成，之后只由人工维护 | `memory_get_rules` 以 `service_rule` 返回全文 | MCP 不可写（不在路径白名单）。手改后会话需重新 `get_rules`；删除会在下次启动重建默认内容，原内容丢失 |
 | `skills/` | 启动时创建，初始为空 | 不直接读取，只通过 `get_rules.global_skills` 出现 | 删掉会重启重建，无副作用 |
 | `skills/<name>/SKILL.md` | 项目技能由 `memory_write` 写入；`skill_promote(action=promote)` 或 `approve` 后移动到 `skills/`（与 `projects/` 平级），项目内副本删除 | `get_rules.global_skills` 列出；`memory_read` 读 `@global/skills/<name>/SKILL.md` | MCP 只读；要改先在项目里建一份再提升。删除即失去该全局技能 |
-| `projects/<slug>/RULE.md` | 项目首次被访问时自动生成；新建主题时自动插索引行，`reindex` 补漏 | 每次 `get_rules` 返回全文与 `warnings` | 手改会让旧 session 失效（`RULE_CHANGED`），需重新 `get_rules`；索引写错在下次 `get_rules` 报 `missing_in_index` / `missing_file` / `index_too_large` / `row_too_long` |
+| `projects/<slug>/RULE.md` | 项目首次被访问时自动生成；新建主题时自动插索引行；写技能时自动更新「## 技能」段，`reindex` 补漏 | 每次 `get_rules` 返回全文与 `warnings` | 手改会让旧 session 失效（`RULE_CHANGED`），需重新 `get_rules`；索引写错在下次 `get_rules` 报 `missing_in_index` / `missing_file` / `index_too_large` / `row_too_long` |
 | `TASKS.md` | 项目首次访问时生成；表格行由 `memory_write` 写入 | `get_rules.tasks` 直接返回解析后的行；需要原文时 `memory_read` | 六列：任务 / 状态 / 下一步 / 涉及文件 / 推进者（自报） / 更新时间。写入时服务端把旧四列、五列自动升级为六列，并补「推进者」与「更新时间」；任务完成要删行。手改后同样要重新 `get_rules` 才能写 |
 | `topics/*.md` | `memory_write`（新建必须带索引行）或 `memory_import` | `memory_read` 按索引「适用场景」挑选阅读 | `replace` 前自动快照到 `.history`；直接删除会留下索引行，下次 `get_rules` 报 `missing_file` |
 | `journal/YYYY-MM/<姓名>-<标题>-<hhmmss>.md` | 模型收尾时 `memory_write` 写入，服务端按 `userName`（缺省会话标签）与当前时间重命名，并保留你给的文件名做标题 | 不在 `get_rules` 正文里，只在当月索引中出现 | 可直接删除，索引行不会自动清理；不影响主题文档 |

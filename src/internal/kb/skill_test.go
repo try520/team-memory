@@ -178,6 +178,33 @@ func TestSkillPromoteLifecycle(t *testing.T) {
 	}
 }
 
+func TestSkillAppearsInRuleIndex(t *testing.T) {
+	svc := newSvc(t)
+	rules := mustRules(t, svc, "proj-a")
+	if _, e := svc.Write("proj-a", WriteReq{
+		Path: "skills/demo-skill/SKILL.md", Mode: "create", Session: rules.Session,
+		Content: "---\nname: demo-skill\ndescription: 演示技能\n---\n\n# demo\n",
+	}); e != nil {
+		t.Fatalf("create skill: %+v", e)
+	}
+	rule, _, err := svc.st.ReadFile("proj-a", "RULE.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"## 技能", "demo-skill", "演示技能"} {
+		if !strings.Contains(string(rule), want) {
+			t.Fatalf("RULE.md 技能段缺少 %q:\n%s", want, rule)
+		}
+	}
+	// 索引是服务端补的，同一 session 应能继续写入。
+	if _, e := svc.Write("proj-a", WriteReq{
+		Path: "TASKS.md", Mode: "append", Session: rules.Session,
+		Content: "| 索引校验 | 进行中 | - | - | | |\n",
+	}); e != nil {
+		t.Fatalf("技能索引更新后同 session 应仍可写: %+v", e)
+	}
+}
+
 func TestSkillPromoteMovesToGlobal(t *testing.T) {
 	svc := newSvc(t)
 	rules := mustRules(t, svc, "proj-a")
@@ -214,6 +241,14 @@ func TestSkillPromoteMovesToGlobal(t *testing.T) {
 	list, _ := svc.SkillList("proj-a")
 	if len(list.Project) != 0 || len(list.Global) != 1 || list.Global[0].Status != skillStatusApproved {
 		t.Fatalf("清单不对: project=%+v global=%+v", list.Project, list.Global)
+	}
+	// 提升后项目索引里的技能段也应同步移除。
+	rule, _, err := svc.st.ReadFile("proj-a", "RULE.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(rule), "demo-skill") {
+		t.Fatalf("提升后 RULE.md 仍登记项目技能:\n%s", rule)
 	}
 
 	// 已提升后再 promote → 409。

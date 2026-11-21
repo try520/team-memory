@@ -108,6 +108,10 @@ func projectRuleTemplate(slug string) string {
 | 文档 | 适用场景 | 举例 |
 | --- | --- | --- |
 
+## 技能
+
+（暂无项目技能；用 memory_write 写 skills/<name>/SKILL.md 新建。）
+
 ## 使用规则
 
 1. 动手前先读本索引，按「适用场景」选与本次业务最相关的主题读，覆盖本次要碰的代码和数据即停，不够再继续；不要一次读完文档目录。

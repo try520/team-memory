@@ -2,6 +2,7 @@ package kb
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -200,11 +201,24 @@ func (s *Service) SkillList(slug string) (*SkillListResp, *Error) {
 	if e != nil {
 		return nil, e
 	}
-	local := make([]SkillInfo, 0)
-	files, err := s.st.ListFiles(slug)
+	local, err := s.projectSkillInfos(slug)
 	if err != nil {
 		return nil, errf("INTERNAL", 500, "列项目技能失败", err.Error())
 	}
+	return &SkillListResp{
+		Global:  global,
+		Project: local,
+		Hint:    "读技能全文用 memory_read(path=返回的 path)；写/改项目技能用 memory_write(path=skills/<name>/SKILL.md)。把项目技能一步提升为全局技能用 skill_promote(action=promote)，需要审批则用 submit→approve。",
+	}, nil
+}
+
+// projectSkillInfos 列出当前项目技能（读 skills/<name>/SKILL.md 的 frontmatter）。
+func (s *Service) projectSkillInfos(slug string) ([]SkillInfo, error) {
+	files, err := s.st.ListFiles(slug)
+	if err != nil {
+		return nil, err
+	}
+	local := make([]SkillInfo, 0)
 	for _, f := range files {
 		parts := strings.Split(f.Path, "/")
 		if len(parts) != 3 || parts[0] != "skills" || parts[2] != "SKILL.md" {
@@ -220,11 +234,101 @@ func (s *Service) SkillList(slug string) (*SkillListResp, *Error) {
 		}
 		local = append(local, skillInfoFrom("project", parts[1], f.Path, doc.fm))
 	}
-	return &SkillListResp{
-		Global:  global,
-		Project: local,
-		Hint:    "读技能全文用 memory_read(path=返回的 path)；写/改项目技能用 memory_write(path=skills/<name>/SKILL.md)。把项目技能一步提升为全局技能用 skill_promote(action=promote)，需要审批则用 submit→approve。",
-	}, nil
+	return local, nil
+}
+
+// syncSkillIndex 把项目技能清单写回 RULE.md 的「## 技能」段，
+// 这样模型只读项目索引就能发现有哪些技能，不用额外调 skill_list。
+// RULE.md 是服务端自己改的，写完把该项目的 session 对齐到新 hash，避免下一次写入报 RULE_CHANGED。
+func (s *Service) syncSkillIndex(slug string) *Error {
+	rule, _, err := s.st.ReadFile(slug, "RULE.md")
+	if err != nil {
+		return errf("INTERNAL", 500, "读取 RULE.md 失败", err.Error())
+	}
+	skills, lerr := s.projectSkillInfos(slug)
+	if lerr != nil {
+		return errf("INTERNAL", 500, "列项目技能失败", lerr.Error())
+	}
+	updated := replaceSection(string(rule), skillSectionHeading, renderSkillSection(skills))
+	if updated == string(rule) {
+		return nil
+	}
+	if err := s.st.Snapshot(slug, "RULE.md", rule); err != nil {
+		return errf("INTERNAL", 500, "写历史快照失败", err.Error())
+	}
+	if err := s.st.WriteAtomic(slug, "RULE.md", []byte(updated)); err != nil {
+		return errf("INTERNAL", 500, "写 RULE.md 失败", err.Error())
+	}
+	if h, e := s.ruleHash(slug); e == nil {
+		s.mu.Lock()
+		for k, v := range s.sessions {
+			if v.project == slug {
+				v.ruleHash = h
+				s.sessions[k] = v
+			}
+		}
+		s.mu.Unlock()
+	}
+	return nil
+}
+
+const skillSectionHeading = "## 技能"
+
+func renderSkillSection(skills []SkillInfo) string {
+	var b strings.Builder
+	b.WriteString(skillSectionHeading + "\n\n")
+	if len(skills) == 0 {
+		b.WriteString("（暂无项目技能；用 memory_write 写 skills/<name>/SKILL.md 新建。）\n")
+		return b.String()
+	}
+	b.WriteString("| 技能 | 用途 |\n| --- | --- |\n")
+	for _, sk := range skills {
+		desc := strings.TrimSpace(sk.Description)
+		if desc == "" {
+			desc = "—"
+		}
+		fmt.Fprintf(&b, "| [%s](%s) | %s |\n", sk.Name, sk.Path, desc)
+	}
+	return b.String()
+}
+
+// replaceSection 用 block 替换同名二级标题段；没有该段就插在「## 使用规则」前，再没有就追加到文末。
+func replaceSection(doc, heading, block string) string {
+	lines := strings.Split(doc, "\n")
+	blockLines := strings.Split(strings.TrimRight(block, "\n"), "\n")
+	start := -1
+	for i, ln := range lines {
+		if strings.TrimSpace(ln) == heading {
+			start = i
+			break
+		}
+	}
+	if start >= 0 {
+		end := len(lines)
+		for j := start + 1; j < len(lines); j++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[j]), "## ") {
+				end = j
+				break
+			}
+		}
+		out := append([]string{}, lines[:start]...)
+		out = append(out, blockLines...)
+		if end < len(lines) {
+			out = append(out, "")
+		}
+		out = append(out, lines[end:]...)
+		return strings.Join(out, "\n")
+	}
+	for i, ln := range lines {
+		if strings.TrimSpace(ln) == "## 使用规则" {
+			out := append([]string{}, lines[:i]...)
+			out = append(out, blockLines...)
+			out = append(out, "")
+			out = append(out, lines[i:]...)
+			return strings.Join(out, "\n")
+		}
+	}
+	return strings.TrimRight(doc, "\n") + "\n\n" + strings.TrimRight(block, "\n") + "\n"
 }
 
 // SkillPromote 把项目技能提升为全局技能：promote 一步到位（移动），
@@ -334,6 +438,9 @@ func (s *Service) SkillPromote(slug string, req SkillPromoteReq) (*SkillPromoteR
 		if err := s.st.RemoveProjectSkill(slug, name); err != nil {
 			return nil, errf("INTERNAL", 500, "移除项目技能失败", err.Error())
 		}
+		if e := s.syncSkillIndex(slug); e != nil {
+			return nil, e
+		}
 		return &SkillPromoteResp{
 			OK: true, Action: req.Action, Name: name, Status: skillStatusApproved, Path: globalRel,
 			Hint: "已提升为全局技能，项目内副本已移除（移动，不是复制）。",
@@ -356,6 +463,9 @@ func (s *Service) SkillPromote(slug string, req SkillPromoteReq) (*SkillPromoteR
 		if src := strings.TrimSpace(globalDoc.fm["source_project"]); src != "" {
 			if err := s.st.RemoveProjectSkill(src, name); err != nil {
 				return nil, errf("INTERNAL", 500, "移除项目技能失败", err.Error())
+			}
+			if e := s.syncSkillIndex(src); e != nil {
+				return nil, e
 			}
 		}
 		return &SkillPromoteResp{

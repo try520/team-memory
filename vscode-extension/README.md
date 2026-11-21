@@ -2,7 +2,7 @@
 
 在编辑器里浏览、编辑团队研发记忆服务（team-memory）中的项目记忆：切换项目、看 RULE 索引、按主题/journal 浏览、直接改文件保存回服务、查看索引警告并执行 reindex。
 
-> 版本对应：插件 `0.1.8` 可连服务端 `0.1.1+`（当前服务端 `0.1.7`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
+> 版本对应：插件 `0.1.8` 可连服务端 `0.1.1+`（当前服务端 `0.1.8`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
 
 ## 安装
 
@@ -138,7 +138,7 @@ code --install-extension .\team-memory-0.1.8.vsix
 ```yaml
 services:
   memory:
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.7
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.8
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -172,7 +172,7 @@ docker compose up -d
 docker ps                       # STATUS 变成 healthy 即正常
 
 curl -s http://127.0.0.1:28080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.7"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.8"}
 
 curl -s http://127.0.0.1:28080/mcp
 # 返回 service、version、projects、tools 列表
@@ -219,7 +219,7 @@ tar czf memory-$(date +%F).tgz -C ./data .
 curl -s http://<your-server>:28080/mcp
 # {"endpoint":"/mcp/<project>","projects":["my-project","my-other-project"],"protocol":"2025-06-18",
 #  "service":"team-memory","tools":["memory_get_rules","memory_read","memory_write","memory_import","skill_list","skill_promote"],
-#  "version":"0.1.7",...}
+#  "version":"0.1.8",...}
 ```
 
 它不是 MCP 端点：`POST /mcp` 会返回 `400 {"error":"PROJECT_REQUIRED"}`。客户端一律指向 `/mcp/<project>`。

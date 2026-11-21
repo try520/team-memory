@@ -586,6 +586,13 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 		}
 	}
 
+	// 技能文件写完，把它登记进 RULE.md 的「## 技能」段，模型读索引就能发现有哪些技能。
+	if strings.HasPrefix(rel, "skills/") && strings.HasSuffix(rel, "/SKILL.md") {
+		if e := s.syncSkillIndex(slug); e != nil {
+			return nil, e
+		}
+	}
+
 	indexUpdated := false
 	if newTopic {
 		ok, e := s.insertIndexRow(slug, rel, *req.Index, titleOf(req.Content, rel))
