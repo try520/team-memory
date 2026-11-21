@@ -28,7 +28,7 @@ curl -s http://127.0.0.1:8080/healthz   # {"ok":true,"projects":0,...}
 ```bash
 docker build --build-arg GO_IMAGE=registry.example.com/library/golang:1.23-alpine \
              --build-arg RUNTIME_IMAGE=registry.example.com/library/alpine:3.20 \
-             -t team-memory:0.1.3 .
+             -t team-memory:0.1.4 .
 ```
 
 一个数据目录只允许一个实例：启动会在数据目录写 `.pid`，检测到存活进程直接退出。
@@ -105,7 +105,7 @@ go run ./cmd/import -url http://127.0.0.1:8080 -project my-project \
 
 ```md
 ## 团队记忆（memory MCP）
-- 每次任务开始先调用 `memory_get_rules`，按索引「适用场景」挑 1~2 篇 `memory_read`。
+- 每次任务开始先调用 `memory_get_rules`，按索引「适用场景」选与本次业务最相关的主题 `memory_read`，覆盖要碰的代码和数据即停，不够再继续。
 - 命中服务级规则第 4 条任一条件（定方案/踩坑/接口或表结构变更/关键结论/任务状态/纠正旧结论）立即 `memory_write`。
 - 收尾必须写 journal；无事写「本次无需记录：原因」。
 ```
@@ -119,13 +119,18 @@ go run ./cmd/import -url http://127.0.0.1:8080 -project my-project \
 |---|---|
 | `memory_get_rules` | 读服务级规则 + 项目索引（RULE.md 全文），返回 `session`、`warnings`、文件清单、当月/上月 journal 索引、`global_skills` 全局技能清单 |
 | `memory_read` | 读文件；`rev` 读 `.history` 旧版；超过 32KB 用 `next_offset` 续读；路径含 `skills/<name>/SKILL.md` 与只读的 `@global/skills/<name>/SKILL.md` |
-| `memory_write` | `create` / `append` / `replace`（必带 `expectedHash`）/ `reindex`（仅 RULE.md）；写技能文件时校验 frontmatter |
+| `memory_write` | `create` / `append` / `replace`（必带 `expectedHash`）/ `reindex`（仅 RULE.md）；写技能文件时校验 frontmatter。可选 `userName`（自报开发者姓名，≤32 字，不能含竖线/换行）用于 TASKS.md 推进者与 journal 命名，缺省回落会话标签；TASKS.md 固定六列，写入时自动升级旧四/五列并在 `warnings` 提示同文件占用（`TASK_CONFLICT`，不阻断） |
 | `memory_import` | 批量导入已有知识：模型先用自己的文件工具读源文档，再分批调它落盘，需 `session`，先 `dry_run` 预演 |
 | `skill_list` | 列出全局技能 + 当前项目技能（只读，无需 session），每项含 `scope/name/description/status/source_project/path` |
 | `skill_promote` | 技能提审：`submit`（生成全局 pending）→ `approve`（转 approved，各项目可见）/ `reject` / `cancel`，需 `session` |
 
 新建主题必须带 `index: {scene, examples}`，服务端按固定格式把行插进 `RULE.md` 索引表；
-写 `journal/YYYY-MM/<label>-<hhmm>.md` 时自动向 `journal/YYYY-MM.INDEX.md` 追加一行。
+写 `journal/YYYY-MM/` 下的 `.md` 时，服务端自动改名为 `journal/YYYY-MM/<姓名>-<hhmmss>.md`（`userName` 优先，
+缺省会话标签；同名同秒追加 `-2`、`-3` 去重），并向 `journal/YYYY-MM.INDEX.md` 追加一行，「会话标签」列写同一姓名值。
+
+TASKS.md 是开工前的计划 + 文件占用表，六列：`任务 | 状态 | 下一步 | 涉及文件 | 推进者（自报） | 更新时间`。
+规划完成后、改代码前先 `memory_write` 写计划（涉及文件用户号或顿号分隔）；改文件前先 `memory_read` 看是否被其他会话登记；
+任务完成立刻 `replace` 删行。这是自报的协作约定，不是锁，同时开工仍可能撞上；真正的兜底是按文件串行 + `expectedHash`。
 
 `memory_import` 是给模型用的批量入口：一次可提交多篇原文 + 索引行（`merge` 默认跳过已存在，可反复执行），
 适合「这个项目已经有一堆 md 规则，先灌进去」的场景；日常零散结论仍用 `memory_write`。

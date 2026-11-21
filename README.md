@@ -80,9 +80,9 @@ data/
 │   └── <name>/SKILL.md           提审通过后的全局技能
 └── projects/<slug>/
     ├── RULE.md                   项目索引表（模型第一眼读的）
-    ├── TASKS.md                   任务表（五列）
+    ├── TASKS.md                  开工前计划 + 文件占用表（六列）
     ├── topics/*.md               主题文档（知识正文）
-    ├── journal/YYYY-MM/*.md      会话日志
+    ├── journal/YYYY-MM/<姓名>-<hhmmss>.md  会话日志
     ├── journal/YYYY-MM.INDEX.md  当月日志索引
     └── .history/<相对路径>/<时间>.md  旧版本快照
 ```
@@ -93,17 +93,17 @@ data/
 | `skills/` | 启动时创建，初始为空 | 不直接读取，只通过 `get_rules.global_skills` 出现 | 删掉会重启重建，无副作用 |
 | `skills/<name>/SKILL.md` | `skill_promote` 的 `approve` 从项目技能复制而来 | `get_rules.global_skills` 列出；`memory_read` 读 `@global/skills/<name>/SKILL.md` | MCP 只读；要改先在项目里改再重新提审。删除即失去该全局技能（项目内副本仍在） |
 | `projects/<slug>/RULE.md` | 项目首次被访问时自动生成；新建主题时自动插索引行，`reindex` 补漏 | 每次 `get_rules` 返回全文与 `warnings` | 手改会让旧 session 失效（`RULE_CHANGED`），需重新 `get_rules`；索引写错在下次 `get_rules` 报 `missing_in_index` / `missing_file` / `index_too_large` / `row_too_long` |
-| `TASKS.md` | 项目首次访问时生成；表格行由 `memory_write` 写入 | 通过 `memory_read` 读取；`get_rules` 的文件清单里列出 | 写表格时服务端自动补「推进者（自报）」与「更新时间」，手改后同样要重新 `get_rules` 才能写 |
+| `TASKS.md` | 项目首次访问时生成；表格行由 `memory_write` 写入 | 通过 `memory_read` 读取；`get_rules` 的文件清单里列出 | 六列：任务 / 状态 / 下一步 / 涉及文件 / 推进者（自报） / 更新时间。写入时服务端把旧四列、五列自动升级为六列，并补「推进者」（优先 `userName`，否则会话标签）与「更新时间」；改文件前先读它看占用，任务完成立刻删行。手改后同样要重新 `get_rules` 才能写 |
 | `topics/*.md` | `memory_write`（新建必须带索引行）或 `memory_import` | `memory_read` 按索引「适用场景」挑选阅读 | `replace` 前自动快照到 `.history`；直接删除会留下索引行，下次 `get_rules` 报 `missing_file` |
-| `journal/YYYY-MM/<label>-<hhmm>.md` | 模型收尾时 `memory_write` 写入 | 不在 `get_rules` 正文里，只在当月索引中出现 | 可直接删除，索引行不会自动清理；不影响主题文档 |
+| `journal/YYYY-MM/<姓名>-<hhmmss>.md` | 模型收尾时 `memory_write` 写入，服务端按 `userName`（缺省会话标签）与当前时间重命名 | 不在 `get_rules` 正文里，只在当月索引中出现 | 可直接删除，索引行不会自动清理；不影响主题文档 |
 | `journal/YYYY-MM.INDEX.md` | 写 journal 时由服务端自动追加一行（列为「日期 / 会话标签 / 一句话 / 文件」） | `get_rules` 返回当月与上月的索引文件清单，模型按需 `memory_read` | 手改不会立刻报错，但会与日志文件不一致；没有强校验。已有旧文件保留原「人」表头，仅追加新行 |
 | `.history/<相对路径>/<时间>.md` | 任何 `replace` 或 `import(mode=replace)` 覆盖前自动生成 | `memory_read` 传 `rev` 读取旧版本 | 每个文件只保留最近 50 份，自动清理；删掉只丢历史，不影响当前内容 |
 | `.pid` | 启动时写入进程号（容器内为 `1`），退出时删除 | 模型用不到 | 用作单实例锁。运行中删除可能导致同一数据目录被启动第二个实例，不要删 |
 
 **自动维护 vs 人工编辑**
 
-- 服务端自动维护：`RULE.md` 的索引行、`journal/*.INDEX.md`、`.history/`、`.pid`、`skills/` 目录本身、`TASKS.md` 的「推进者/更新时间」两列。
-- 鼓励人工编辑：`_service/RULES.md`、`topics/*.md` 正文、`TASKS.md` 的「任务/状态/下一步」、项目 `RULE.md` 里索引行的「适用场景」。
+- 服务端自动维护：`RULE.md` 的索引行、`journal/*.INDEX.md`、journal 文件名、`.history/`、`.pid`、`skills/` 目录本身、`TASKS.md` 的「推进者/更新时间」两列。
+- 鼓励人工编辑：`_service/RULES.md`、`topics/*.md` 正文、`TASKS.md` 的「任务/状态/下一步/涉及文件」、项目 `RULE.md` 里索引行的「适用场景」。
 - 直接改磁盘文件不会触发写入校验，也不会更新 session 的规则哈希；改动只在**下一次 `get_rules`** 被感知，索引问题也到那时才以 `warnings` 形式报出。
 
 ## 快速开始（Docker）
@@ -112,7 +112,7 @@ data/
 cd src
 docker compose up -d
 curl -s http://127.0.0.1:8080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.3"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.4"}
 ```
 
 `docker-compose.yml` 默认从本目录构建镜像，并把 `./data` 挂到容器的 `/data`。镜像已公开发布、可匿名拉取，也可 `docker compose up -d --build` 本地构建。
@@ -122,7 +122,7 @@ curl -s http://127.0.0.1:8080/healthz
 ```yaml
 services:
   memory:
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.3
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.4
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -171,11 +171,15 @@ services:
 
 服务端提供 6 个工具：`memory_get_rules`、`memory_read`、`memory_write`、`memory_import`、`skill_list`、`skill_promote`。详见 [src/README.md](src/README.md)。
 
+`memory_write` 的可选参数 `userName` 是调用方自报的开发者姓名（≤32 字，不能含竖线/换行），用于 TASKS.md 的「推进者」与 journal 文件名/索引标签；缺省回落到 `s_xxxxxxxx` 会话标签。它不是身份认证，不能用于追责。
+
+TASKS.md 是**开工前的计划 + 文件占用表**：规划完成后、改代码前先写计划（含涉及文件），改文件前先读它看是否被其他会话登记，任务完成立刻删行。写入时若发现同一路径被别的会话登记，响应 `warnings` 会给出 `TASK_CONFLICT` 提示，但不阻断——这是自报的协作约定，不是锁，真正的兜底是服务端按文件串行 + `expectedHash` 校验。
+
 > 服务端不调用大模型，`initialize.instructions` 也不保证被客户端注入。要让它真的「开场读、结束写」，需要把 [client-rule-prompt.md](docs/design/client-rule-prompt.md) 里的三行写进客户端每次必注入的项目说明（`CLAUDE.md` / `QWEN.md` / `AGENTS.md`）。
 
 ## 编辑器扩展
 
-扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.1`、服务端 `0.1.3`（插件可连 `0.1.1+`）：
+扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.1`、服务端 `0.1.4`（插件可连 `0.1.1+`）：
 
 ```powershell
 code --install-extension .\team-memory-<version>.vsix

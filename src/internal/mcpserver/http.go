@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	Version         = "0.1.3"
+	Version         = "0.1.4"
 	DefaultProtocol = "2025-06-18"
 	SessionHeader   = "Mcp-Session-Id"
 	ProtocolHeader  = "MCP-Protocol-Version"
@@ -313,13 +313,16 @@ func (s *Server) handleMessage(req *rpcRequest, project string, r *http.Request)
 				"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 				"serverInfo":      map[string]any{"name": "team-memory", "version": Version},
 				"instructions": "使用顺序：先 memory_get_rules 读服务级规则与项目索引（返回的 session 供写入），" +
-					"按索引「适用场景」挑 1~2 篇 memory_read；需要源码与字段时按文档里的路径读仓库、按表名查库，不要一次读完 topics/。" +
+					"按索引「适用场景」选与本次业务最相关的 memory_read，覆盖本次要碰的代码和数据即停，不够再继续；需要源码与字段时按文档里的路径读仓库、按表名查库，不要一次读完 topics/。" +
 					"任务收尾必须回写：命中服务级规则第 4 条任一硬条件（定了方案/踩坑解决/接口或表结构变更/关键结论/任务状态变化/纠正旧结论）就立即 memory_write；" +
 					"每次会话都写 journal，确实无事可记也写「本次无需记录：原因」；写入响应里的 next 会告诉你下一步。" +
 					"首次接入已有项目时，用你自己的文件工具读源文档，分批调 memory_import（先 dry_run 预演），把历史知识导入，再用 memory_write 记本次结论。" +
 					"技能：用户说「根据之前的操作生成 xx 技能」用 memory_write 写 skills/<name>/SKILL.md（frontmatter 含 name/description）；" +
 					"「修改 / 完善 xx 技能」用 memory_write 的 append/replace；「把 xx 技能提升为全局技能」用 skill_promote(action=submit) 提审，" +
-					"再由维护者 approve；全局技能会自动列在各项目 get_rules 的 global_skills 中，可用 skill_list 查看。",
+					"再由维护者 approve；全局技能会自动列在各项目 get_rules 的 global_skills 中，可用 skill_list 查看。" +
+					"协作：规划完成后、改代码前先把计划写进 TASKS.md（六列，含涉及文件）；改文件前先读 TASKS.md 看是否被其他会话登记，" +
+					"有就避开或沟通，做完立刻删行。服务端只在 warnings 里提示冲突，不阻断；这不是锁，兜底是按文件串行 + expectedHash。" +
+					"知道开发者姓名时，在 memory_write 里带上 userName（写进 TASKS 推进者与 journal 索引标签）；它是自报信息，不是身份认证，不能用于追责；不知道就不要编。",
 			}),
 		}
 	}
@@ -421,6 +424,7 @@ func (s *Server) callTool(raw json.RawMessage, project string) (any, *rpcError) 
 			ExpectedHash    string       `json:"expectedHash"`
 			ExpectedHashAlt string       `json:"expected_hash"`
 			Session         string       `json:"session"`
+			UserName        string       `json:"userName"`
 			Index           *kb.IndexRow `json:"index"`
 		}
 		if err := json.Unmarshal(p.Arguments, &a); err != nil {
@@ -443,7 +447,7 @@ func (s *Server) callTool(raw json.RawMessage, project string) (any, *rpcError) 
 		}
 		resp, e := s.svc.Write(project, kb.WriteReq{
 			Path: a.Path, Content: a.Content, Mode: a.Mode,
-			ExpectedHash: expected, Session: a.Session, Index: a.Index,
+			ExpectedHash: expected, Session: a.Session, UserName: a.UserName, Index: a.Index,
 		})
 		if e != nil {
 			return toolError(e), nil

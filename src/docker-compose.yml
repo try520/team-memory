@@ -2,7 +2,7 @@ services:
   memory:
     build: .
     # 可本地构建（docker compose up -d --build）；预构建镜像已公开发布在阿里云，匿名可拉。
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.3
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.4
     container_name: team-memory
     restart: unless-stopped
     ports:

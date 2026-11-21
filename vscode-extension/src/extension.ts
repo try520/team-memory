@@ -362,12 +362,13 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
     for (let i = 0; i < 5 && !written; i++) {
       const rel = `${base}${i === 0 ? '' : `-${i + 1}`}.md`;
       try {
-        await this.client().write({
+        const resp = await this.client().write({
           path: rel,
           content: `# ${label.trim()}\n\n${note.trim()}\n`,
           mode: 'create',
         });
-        written = rel;
+        // 服务端会把 journal 文件名改为 <姓名或会话标签>-<hhmmss>.md，以返回的 path 为准。
+        written = resp.path || rel;
       } catch (e) {
         if (e instanceof ToolError && e.code === 'ALREADY_EXISTS') continue;
         throw e;

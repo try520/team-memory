@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"team-memory/internal/store"
@@ -118,6 +119,7 @@ type WriteReq struct {
 	Mode         string    `json:"mode"`
 	ExpectedHash string    `json:"expectedHash"`
 	Session      string    `json:"session"`
+	UserName     string    `json:"userName"`
 	Index        *IndexRow `json:"index"`
 }
 
@@ -443,6 +445,12 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 	if e := s.lookupSession(req.Session, slug); e != nil {
 		return nil, e
 	}
+	// userName 是调用方自报的名字：仅用于展示与协作提示，不是身份认证。
+	name, e := normalizeUserName(req.UserName)
+	if e != nil {
+		return nil, e
+	}
+	req.UserName = name
 	if req.Mode == "reindex" {
 		return s.reindex(slug, req)
 	}
@@ -458,6 +466,12 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 	if strings.HasPrefix(rel, globalSkillPrefix) {
 		return nil, errf("GLOBAL_SKILL_READONLY", 403, "全局技能不能通过 memory_write 写入",
 			"全局技能只能经 skill_promote(action=submit) 提交并审批；修改项目技能请用 skills/<name>/SKILL.md。")
+	}
+
+	// journal 文件名由服务端统一为 <姓名或会话标签>-<hhmmss>.md，保证「谁写的」一眼可见；
+	// 仅对 create 生效，append/replace 仍按调用方给出的路径。
+	if req.Mode == "create" && isJournalPath(rel) {
+		rel = s.journalPath(slug, rel, authorName(req.UserName, req.Session))
 	}
 
 	unlock := s.st.Lock(slug + "|" + rel)
@@ -526,7 +540,7 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 	}
 	// TASKS.md 由服务端补「推进者（自报）」与「更新时间」，不让模型手填时间。
 	if rel == "TASKS.md" {
-		newContent = []byte(normalizeTasks(string(newContent), req.Session, s.now()))
+		newContent = []byte(normalizeTasks(string(newContent), req.Session, req.UserName, s.now()))
 	}
 
 	// 只有覆盖写才留快照；append 不改旧内容。
@@ -557,19 +571,26 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 
 	journalIndexed := false
 	if isJournalPath(rel) {
-		if err := s.appendJournalIndex(slug, rel, newContent); err == nil {
+		if err := s.appendJournalIndex(slug, rel, newContent, authorName(req.UserName, req.Session)); err == nil {
 			journalIndexed = true
 		}
 	}
 
 	rule, _, _ := s.st.ReadFile(slug, "RULE.md")
+	warnings := s.warnings(slug, string(rule))
+	// 写入其它文件时，若 TASKS.md 里有其他会话登记了同一路径，追加一条提示（不阻断写入）。
+	if rel != "TASKS.md" {
+		if tasks, _, e := s.st.ReadFile(slug, "TASKS.md"); e == nil {
+			warnings = append(warnings, tasksConflicts(string(tasks), rel, req.Session, req.UserName)...)
+		}
+	}
 	resp := &WriteResp{
 		OK:           true,
 		Path:         rel,
 		Hash:         sha256Hex(newContent),
 		Lines:        strings.Count(string(newContent), "\n") + 1,
 		IndexUpdated: indexUpdated,
-		Warnings:     s.warnings(slug, string(rule)),
+		Warnings:     warnings,
 	}
 	if journalIndexed {
 		resp.Hint = "已追加当月 journal 索引行。"
@@ -723,7 +744,7 @@ func (s *Service) reindex(slug string, req WriteReq) (*WriteResp, *Error) {
 	return resp, nil
 }
 
-func (s *Service) appendJournalIndex(slug, rel string, content []byte) error {
+func (s *Service) appendJournalIndex(slug, rel string, content []byte, author string) error {
 	rest := strings.TrimPrefix(rel, "journal/")
 	parts := strings.Split(rest, "/")
 	if len(parts) != 2 {
@@ -742,6 +763,9 @@ func (s *Service) appendJournalIndex(slug, rel string, content []byte) error {
 		cur = []byte(journalIndexHeader(ym))
 	}
 	label, _ := splitJournalName(base)
+	if author != "" {
+		label = sanitizeFilePart(author)
+	}
 	line := fmt.Sprintf("| %s | %s | %s | %s |\n", s.now().Format("2006-01-02"), label, summarize(content), base)
 	return s.st.WriteAtomic(slug, indexRel, append(cur, []byte(line)...))
 }
@@ -751,6 +775,50 @@ func isJournalPath(rel string) bool {
 		return false
 	}
 	return strings.Count(strings.TrimPrefix(rel, "journal/"), "/") == 1
+}
+
+// authorName 返回写入者标签：优先 userName，缺省回落到会话标签。
+func authorName(userName, session string) string {
+	if userName != "" {
+		return userName
+	}
+	return session
+}
+
+// journalPath 把 journal 路径改写成 journal/<YYYY-MM>/<作者>-<hhmmss>.md；
+// 同一作者同一秒重复写入时追加 -2、-3 去重。
+func (s *Service) journalPath(slug, rel, author string) string {
+	parts := strings.Split(strings.TrimPrefix(rel, "journal/"), "/")
+	if len(parts) != 2 || !isYearMonth(parts[0]) {
+		return rel
+	}
+	ym := parts[0]
+	base := sanitizeFilePart(author) + "-" + s.now().Format("150405")
+	candidate := "journal/" + ym + "/" + base + ".md"
+	for i := 2; ; i++ {
+		if _, _, err := s.st.ReadFile(slug, candidate); err != nil {
+			return candidate
+		}
+		candidate = fmt.Sprintf("journal/%s/%s-%d.md", ym, base, i)
+	}
+}
+
+// sanitizeFilePart 只做最小清洗：去掉路径分隔符、控制字符和会破坏表格/路径的字符，
+// 保留中文与内部空格；清洗后为空则用 anon 兜底。
+func sanitizeFilePart(author string) string {
+	var b strings.Builder
+	for _, r := range author {
+		if r == '/' || r == '\\' || r == '|' || r == ':' || r == '*' || r == '?' ||
+			r == '"' || r == '<' || r == '>' || unicode.IsControl(r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	name := strings.Trim(strings.TrimSpace(b.String()), ".")
+	if name == "" {
+		return "anon"
+	}
+	return truncateRunes(name, 32)
 }
 
 func isYearMonth(s string) bool {

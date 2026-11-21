@@ -169,7 +169,7 @@ func (s *Service) Import(slug string, req ImportReq) (*ImportResp, *Error) {
 			}
 			werr := s.st.WriteAtomic(slug, it.rel, it.content)
 			if werr == nil && isJournalPath(it.rel) {
-				werr = s.appendJournalIndex(slug, it.rel, it.content)
+				werr = s.appendJournalIndex(slug, it.rel, it.content, "")
 			}
 			if werr != nil {
 				unlock()

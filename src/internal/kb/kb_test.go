@@ -92,7 +92,7 @@ func TestFullChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(ji), "zhangsan-1015.md") || !strings.Contains(string(ji), "回调重复扣款定位") {
+	if !strings.Contains(string(ji), rules.Session) || !strings.Contains(string(ji), "回调重复扣款定位") || !strings.Contains(string(ji), ".md |") {
 		t.Fatalf("月度索引不对:\n%s", ji)
 	}
 
@@ -309,7 +309,7 @@ func TestIndexWarningsAndJournalIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := string(ji)
-	if strings.Count(body, "zhangsan-1015.md") != 1 || strings.Count(body, "lisi-1420.md") != 1 {
+	if strings.Count(body, "| "+rules2.Session+" |") != 2 {
 		t.Fatalf("月度索引行数不对:\n%s", body)
 	}
 	if strings.Contains(body, ".INDEX.md") {
@@ -495,7 +495,7 @@ func TestJournalIndexHeaderAndLegacyCompat(t *testing.T) {
 	if !strings.Contains(string(old), "| 日期 | 人 | 一句话 | 文件 |") || strings.Contains(string(old), "会话标签") {
 		t.Fatalf("旧表头不应被重写:\n%s", old)
 	}
-	if !strings.Contains(string(old), "old.md") || !strings.Contains(string(old), "lisi-1010.md") {
+	if !strings.Contains(string(old), "old.md") || !strings.Contains(string(old), rules.Session) {
 		t.Fatalf("旧索引应保留旧行并追加新行:\n%s", old)
 	}
 }

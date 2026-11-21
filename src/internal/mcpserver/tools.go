@@ -9,7 +9,7 @@ func toolDefs() []any {
 			"title": "读取项目规则与索引",
 			"description": "在任何读取或写入之前先调用。返回服务级规则、项目 RULE.md 索引全文、文件清单、索引体检 warnings、" +
 				"当月/上月 journal 索引、距上次记录的天数（last_write / days_since_write / record_reminder），以及写入所需的 session。" +
-				"用返回索引里的「适用场景/举例」决定接下来读哪 1~2 篇主题文档，不要一次性读整个 topics/ 目录。" +
+				"用返回索引里的「适用场景/举例」决定先读哪些最相关的主题文档，覆盖本次要碰的代码和数据即停，不够再继续；不必一次读完整 topics/ 目录。" +
 				"返回结构：{project, rule_hash, session, service_rule, index, files[], journal_index[], warnings[], journal_window, last_write, days_since_write, record_reminder}。",
 			"inputSchema": map[string]any{
 				"type":                 "object",
@@ -22,7 +22,7 @@ func toolDefs() []any {
 			"name":  "memory_read",
 			"title": "读取记忆文件",
 			"description": "读取项目内一个 md 文件的全文：RULE.md、TASKS.md、topics/**/*.md、journal/**/*.md。" +
-				"通常只读索引挑中的 1~2 篇主题；index 里只有场景，结论/原因/坑/代码位置都在主题文档里。" +
+				"按相关度读索引选中的主题，够用就停；index 里只有场景，结论/原因/坑/代码位置都在主题文档里。" +
 				"传 rev 可读该文件被覆盖前的历史快照；文件超过 32KB 时用 next_offset 作为 offset 续读。" +
 				"返回结构：{path, rev?, hash, lines, bytes, truncated, next_offset?, content}。" +
 				"路径不存在时返回 isError=true、error=NOT_FOUND，并附 available 文件列表。",
@@ -47,13 +47,18 @@ func toolDefs() []any {
 				"replace 整篇覆盖，必须带 expectedHash（memory_read 返回的 hash），覆盖前自动留历史快照，hash 不符返回 409 HASH_MISMATCH；" +
 				"reindex 只作用于 RULE.md，为 topics/ 下没登记的主题补默认行（行尾 <!-- auto -->），不删任何已有行。" +
 				"新建 topics/ 下的主题必须同时给 index.scene（什么场景必须读，≤120 字）与 index.examples（2~3 个真实提问），" +
-				"否则返回 409 INDEX_ROW_REQUIRED；服务端会把索引行按固定格式插入 RULE.md。写 journal/YYYY-MM/<label>-<hhmm>.md 时，" +
-				"服务端自动向当月 journal 索引追加一行。返回结构：{ok, path, hash, lines, index_updated, warnings?, hint?, next}；" +
+				"否则返回 409 INDEX_ROW_REQUIRED；服务端会把索引行按固定格式插入 RULE.md。写 journal/YYYY-MM/ 下的 .md 时，" +
+				"服务端会自动改名为 <姓名>-<hhmmss>.md（无名则用会话标签）并向当月 journal 索引追加一行。返回结构：{ok, path, hash, lines, index_updated, warnings?, hint?, next}；" +
+				"TASKS.md 是开工前计划 + 文件占用表（六列：任务/状态/下一步/涉及文件/推进者/更新时间）：规划完成后先写计划再改代码，" +
+				"改文件前先读 TASKS.md 看有没有别的会话登记同一文件，做完立刻删行；服务端只在 warnings 提示冲突、不阻断，" +
+				"这是自报约定而非锁，兜底是按文件串行 + expectedHash。" +
+				"userName 可选：调用方自报的开发者姓名，用于 TASKS.md 的「推进者」与 journal 索引的「会话标签」；" +
+				"它不是身份认证，不能用于追责；知道姓名就带，不知道不要编，缺省回落到会话标签。" +
 				"next 是下一步该做什么的提示（例如「索引行已插入，收尾再写 journal」），按它继续，不要写完就走。",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"path": map[string]any{"type": "string", "description": "项目内相对路径：RULE.md、TASKS.md、topics/**.md、journal/YYYY-MM/<label>-<hhmm>.md"},
+					"path": map[string]any{"type": "string", "description": "项目内相对路径：RULE.md、TASKS.md、topics/**.md、journal/YYYY-MM/<任意名>.md（服务端会改名为 <姓名>-<hhmmss>.md）"},
 					"content": map[string]any{"type": "string",
 						"description": "写入内容（md）。create/replace 是完整正文，append 是要追加的片段；reindex 时忽略"},
 					"mode": map[string]any{"type": "string", "enum": []string{"create", "append", "replace", "reindex"},
@@ -62,6 +67,8 @@ func toolDefs() []any {
 						"description": "replace 必填：memory_read 返回的 hash，用于并发冲突检测"},
 					"session": map[string]any{"type": "string",
 						"description": "memory_get_rules 返回的 session；规则变更后旧 session 失效，需重新获取"},
+					"userName": map[string]any{"type": "string",
+						"description": "可选。调用方自报的开发者姓名（≤32 字，不能含竖线/换行）；用作 TASKS.md 推进者与 journal 索引的会话标签。不是身份认证，不用于追责；不知道就不要填"},
 					"index": map[string]any{
 						"type":        "object",
 						"description": "新建主题时必填：索引行的「适用场景」与「举例」",
