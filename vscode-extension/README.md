@@ -208,7 +208,7 @@ tar czf memory-$(date +%F).tgz -C ./data .
 
 ## 配置 MCP 客户端
 
-客户端（VS Code / Trae / Claude Code / Qoder / CodeBuddy）的完整配置统一维护在根 README 的 [MCP 接入](../README.md#mcp-接入) 一节，含文件路径、可复制 JSON、`X-Memory-User` 头与连接确认方法。这里不再重复，避免两处漂移。
+客户端（Trae / Claude Code / Qoder / CodeBuddy）的项目级配置统一维护在根 README 的 [MCP 接入](../README.md#mcp-接入) 一节，含文件路径、可复制 JSON、`X-Memory-User` 头与连接确认方法。这里不再重复，避免两处漂移。
 
 插件本身只需要配置 `teamMemory.userName`（见上方设置表）：它会作为 `X-Memory-User` 头带给服务端，写 journal 和建主题时不用再手填名字；留空则回落到会话标签。
 
@@ -227,7 +227,7 @@ curl -s http://<your-server>:28080/mcp
 
 ### 多项目
 
-一个项目一个条目，命名建议 `team-memory-<project>`；换项目只改 URL 最后一段，其他字段不用动。上面的示例都配了两个项目。
+一个项目一个条目，命名建议 `team-memory-<project>`；换项目只改 URL 最后一段，其他字段不用动。根 README 的示例都配了两个项目。
 
 ## 开发
 
@@ -235,10 +235,35 @@ curl -s http://<your-server>:28080/mcp
 cd vscode-extension
 npm install
 npm run compile        # TypeScript → out/
-npx vsce package --no-dependencies --allow-missing-repository
+npx vsce package --no-dependencies --allow-missing-repository `
+  --baseContentUrl "https://github.com/try520/team-memory/blob/main/vscode-extension" `
+  --baseImagesUrl "https://github.com/try520/team-memory/raw/main/vscode-extension"
 ```
 
+`--baseContentUrl` 不能省：仓库主地址在 Gitee，vsce 自动检测不到 README 里相对链接的基准，不加会直接报错。产物是 `team-memory-0.1.5.vsix`（约 28 KB），已被 `.gitignore` 忽略，不进仓库。
+
 调试：用 VS Code 打开 `vscode-extension` 目录，按 `F5` 启动扩展开发宿主。
+
+### 发布 vsix
+
+这里说的「发布」是把打包好的 `.vsix` 分发出去，不是上架应用市场。
+
+1. **本机安装（验证用）**
+
+```powershell
+code --install-extension .\team-memory-0.1.5.vsix
+```
+
+Trae 也一样：扩展面板右上角 `...` → **Install from VSIX...** 选文件，装完 `Ctrl+Shift+P` → `Developer: Reload Window`。
+
+2. **发给同事**：直接发 `team-memory-0.1.5.vsix`，对方用上面同样的方式安装。内网、访问不了市场时用这个。
+
+3. **上架市场（可选，本仓库目前没做）**
+   - VS Code Marketplace：`package.json` 补 `publisher`，在 Azure DevOps 申请带 Marketplace 权限的 Personal Access Token，然后 `npx vsce publish -p <token>`。
+   - Open VSX：`npx ovsx publish team-memory-0.1.5.vsix -p <token>`。
+   - Trae 有自己的扩展市场，是否开放上传需查其开发者后台（未验证）。
+
+改版本号时要同步三处：`package.json` 的 `version`、`package-lock.json` 里根与 `packages[""]` 的 `version`、`src/client.ts` 的 `CLIENT_VERSION`。
 
 ## 服务端要求
 

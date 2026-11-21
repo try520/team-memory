@@ -71,26 +71,9 @@ go run ./cmd/import -url http://127.0.0.1:8080 -project my-project \
 
 ## 接入
 
-传输统一是 Streamable HTTP，地址 `http://<server>:8080/mcp/<project>`；不需要额外 header，
-`Mcp-Session-Id` 由客户端按协议自动携带（服务端在 initialize 响应头签发）。
+传输统一是 Streamable HTTP，地址 `http://<server>:8080/mcp/<project>`；`Mcp-Session-Id` 由客户端按协议自动携带（服务端在 initialize 响应头签发）。建议在项目级配置里加 `X-Memory-User` 请求头自报姓名，写 TASKS 推进者与 journal 文件名时会用到；不配则回落到 `s_xxxxxxxx` 会话标签。
 
-**Claude Code**（项目根 `.mcp.json`，或 `claude mcp add --transport http team-memory-my-project <url>`）：
-
-```json
-{"mcpServers":{"team-memory-my-project":{"type":"http","url":"http://<your-server>:8080/mcp/my-project"}}}
-```
-
-**Cursor**（`.cursor/mcp.json`）：
-
-```json
-{"mcpServers":{"team-memory-my-project":{"url":"http://<your-server>:8080/mcp/my-project"}}}
-```
-
-**VS Code / Copilot**（`.vscode/mcp.json`，顶层键是 `servers`）：
-
-```json
-{"servers":{"team-memory-my-project":{"type":"http","url":"http://<your-server>:8080/mcp/my-project"}}}
-```
+Trae（`.trae/mcp.json`）、Claude Code（`.mcp.json`）、Qoder（`.mcp.json`）、CodeBuddy（`.mcp.json`）四份可直接复制的项目级配置，见根 README 的 [MCP 接入](../README.md#mcp-接入)。
 
 只支持 stdio 的客户端：`npx -y mcp-remote http://<your-server>:8080/mcp/my-project` 做代理。
 首次访问自动创建项目目录、`RULE.md`（含空索引表与使用规则）、`TASKS.md`，零注册。

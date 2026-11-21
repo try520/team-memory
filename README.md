@@ -151,31 +151,15 @@ services:
 
 所有客户端都建议加请求头 `X-Memory-User`，值换成你自己的名字（例如 `张三`）：服务端用它作为 TASKS.md 的「推进者」和 journal 文件名，`get_rules` 会回显 `user_name` 与来源。它是自报信息，不是身份认证，不能用于追责；值非法（超 32 字、含竖线/换行）会被忽略并回落到 `s_xxxxxxxx` 会话标签，不阻断连接。
 
-### VS Code / Copilot：`.vscode/mcp.json`
+下面四个客户端都用**项目级**配置：文件放项目根，只对该项目生效，跟着仓库走。
 
-文件位置：工作区根目录 `.vscode/mcp.json`（没有就新建）。顶层键是 `servers`，远程条目写 `type: "http"`。
+### Trae：项目根 `.trae/mcp.json`
 
-```json
-{
-  "servers": {
-    "team-memory-<project>": {
-      "type": "http",
-      "url": "http://<your-server>:8080/mcp/<project>",
-      "headers": {
-        "X-Memory-User": "张三"
-      }
-    }
-  }
-}
-```
+文件位置：项目根目录 `.trae/mcp.json`（没有就新建）。顶层键是 `mcpServers`。
 
-确认：在 MCP 视图启动该服务器，状态显示已连接，工具列表出现 6 个工具（`memory_get_rules`、`memory_read`、`memory_write`、`memory_import`、`skill_list`、`skill_promote`）；或在 Copilot Chat 的工具体选择器里看到这些工具。
+字段限制：远程条目**只写 `url`、`headers`，不要写 `type`**。依据本机 Trae CN 安装目录 `resources/app/extensions/configuration-editing/package.json` 的映射 `"**/.trae/mcp.json" → "vscode://schemas/mcp-settings/user"`；该 schema 的 HTTP 分支 `required: ["url"]`，字段只有 `url`、`headers`、`oauth`、`fromGalleryId`、`disabled`，且 `additionalProperties: false`。
 
-### Trae：`%APPDATA%\Trae CN\User\mcp.json`
-
-文件位置：Windows 国内版 `%APPDATA%\Trae CN\User\mcp.json`，国际版 `%APPDATA%\Trae\User\mcp.json`（本机两个文件均存在）。顶层键是 `mcpServers`。
-
-字段限制：远程条目**只写 `url`、`headers`，不要写 `type`**。本机 Trae CN 的 schema（注册名 `vscode://schemas/mcp-settings/user`，HTTP 分支 `required: ["url"]`、`additionalProperties: false`）没有 `type` 字段，多写会校验失败。
+注意：`.trae/mcp.json` 和 VS Code 的 `.vscode/mcp.json` 看着像，但不是同一套格式。VS Code 那份对应 schema `vscode://schemas/mcp`，顶层是 `servers` 并写 `type: "http"`；Trae 这份顶层是 `mcpServers`，并且不认 `type`，把 VS Code 的 JSON 直接抄过来会校验失败。
 
 ```json
 {
@@ -190,7 +174,7 @@ services:
 }
 ```
 
-确认：设置 > MCP，该服务器显示已连接，工具列表出现上面 6 个工具。
+确认：Trae 的 MCP 设置面板里该服务器显示已连接，工具列表出现 `memory_get_rules` 等 6 个工具。如果看不到工程级配置，检查 Trae 设置里工作区 MCP 开关（本机安装包里对应 `trae.mcp.enableWorkspaceMcp`）是否已开启；本机此前没有 `.trae/mcp.json`，这项未做实际加载验证。
 
 ### Claude Code：项目根 `.mcp.json`
 
@@ -221,7 +205,7 @@ claude mcp add --scope project --transport http team-memory-<project> \
 
 ### Qoder：项目根 `.mcp.json`
 
-文件位置：项目级 `<项目>/.mcp.json`（顶层 `mcpServers`）；用户级 `%USERPROFILE%\.qoder\settings.json` 的 `mcpServers`。依据 Qoder 官方 MCP 参考，并已用本机 `qodercli mcp add` 实际生成/解析验证。
+文件位置：项目根目录 `.mcp.json`（顶层 `mcpServers`）。依据 Qoder 官方 MCP 参考，并已用本机 `qodercli mcp add -s project` 实际生成/解析验证。
 
 字段限制：远程条目写 `type: "http"`（或 `streamable-http`）、`url`、`headers`。
 
@@ -248,9 +232,9 @@ qodercli mcp add -s project -t http team-memory-<project> \
 
 确认：`qodercli mcp get team-memory-<project>` 能看到 `Type: http`、URL 与 `X-Memory-User` 头；会话内 `/mcp` 查看连接状态与工具列表。本机未启动交互会话，6 个工具的实际注入未实测。
 
-### CodeBuddy：`%USERPROFILE%\.codebuddy\.mcp.json`
+### CodeBuddy：项目根 `.mcp.json`
 
-文件位置：官方文档为 `%USERPROFILE%\.codebuddy\.mcp.json`（Windows）或 `~/.codebuddy/.mcp.json`。本机已有旧版 `%USERPROFILE%\.codebuddy\mcp.json`；官方文档说明，若旧版文件存在则优先写入已存在的那个。顶层键是 `mcpServers`。
+文件位置：项目根目录 `.mcp.json`（顶层 `mcpServers`）。依据 CodeBuddy 官方文档（`codebuddy.ai/docs/cli/mcp`）的 PROJECT Scope 一节：推荐 `<project root>/.mcp.json`（旧的 `mcp.json` 已废弃）。项目级配置首次连接需要你在客户端里确认放行。
 
 字段限制：HTTP 条目写 `type: "http"`、`url`、`headers`（官方 HTTP 类型字段表）。
 
