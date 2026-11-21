@@ -79,6 +79,7 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
     bind('teamMemory.reindex', () => this.reindex());
     bind('teamMemory.showWarnings', () => this.showWarnings());
     bind('teamMemory.showServiceRules', () => this.showServiceRules());
+    bind('teamMemory.showSkill', (path: string) => this.showSkill(path));
     bind('teamMemory.showWarningDetail', (w: IndexWarning) => this.showWarningDetail(w));
     bind('teamMemory.configure', () => this.configure());
 
@@ -438,6 +439,13 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
     if (!this.current.rules) await this.refresh(true);
     const text = this.current.rules?.service_rule || '（服务未返回 service_rule）';
     const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
+    await vscode.window.showTextDocument(doc, { preview: true });
+  }
+
+  /** 全局技能只读：用 memory_read 取正文，开一个 untitled 预览。 */
+  private async showSkill(path: string): Promise<void> {
+    const resp = await this.client().readAll(path);
+    const doc = await vscode.workspace.openTextDocument({ content: resp.content, language: 'markdown' });
     await vscode.window.showTextDocument(doc, { preview: true });
   }
 }

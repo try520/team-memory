@@ -76,6 +76,8 @@ export class MemoryTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     children.push(this.fileNode(this.infoOf(rules, 'RULE.md'), 'RULE.md', '规则与索引'));
     children.push(this.fileNode(this.infoOf(rules, 'TASKS.md'), 'TASKS.md', '任务'));
     children.push(this.serviceRuleNode());
+    const skills = this.skillGroup(rules);
+    if (skills) children.push(skills);
 
     if (topics.length > 0) children.push(this.topicGroup(topics));
     if (journals.length > 0) children.push(this.journalGroup(journals));
@@ -132,6 +134,37 @@ export class MemoryTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     item.command = { command: 'teamMemory.showServiceRules', title: '查看服务级规则' };
     item.tooltip = '所有项目共用的写入规范，来自 memory_get_rules';
     return { item };
+  }
+
+  /** 技能：项目技能用虚拟文件系统打开（可编辑），全局技能只读预览。 */
+  private skillGroup(rules: RulesResp): TreeNode | null {
+    const projectSkills = (rules.files || []).filter(
+      (f) => f.path.startsWith('skills/') && f.path.endsWith('/SKILL.md')
+    );
+    const globalSkills = rules.global_skills || [];
+    if (projectSkills.length === 0 && globalSkills.length === 0) return null;
+
+    const item = new vscode.TreeItem('技能', vscode.TreeItemCollapsibleState.Collapsed);
+    item.iconPath = new vscode.ThemeIcon('symbol-method');
+    item.description = `${projectSkills.length} 项目 / ${globalSkills.length} 全局`;
+
+    const children: TreeNode[] = [];
+    for (const f of projectSkills.sort((a, b) => a.path.localeCompare(b.path))) {
+      const name = f.path.slice('skills/'.length, -'/SKILL.md'.length);
+      const node = this.fileNode(f, f.path, name);
+      node.item.description = `项目 · ${f.lines} 行`;
+      node.item.tooltip = `${f.path}\n项目技能，可直接编辑`;
+      children.push(node);
+    }
+    for (const s of globalSkills) {
+      const node = new vscode.TreeItem(s.name, vscode.TreeItemCollapsibleState.None);
+      node.description = `全局 · ${s.status}`;
+      node.tooltip = `${s.path}\n${s.description || ''}`;
+      node.iconPath = new vscode.ThemeIcon('globe');
+      node.command = { command: 'teamMemory.showSkill', title: '查看技能', arguments: [s.path] };
+      children.push({ item: node });
+    }
+    return { item, children };
   }
 
   private fileNode(info: FileInfo | undefined, rel: string, label?: string): TreeNode {

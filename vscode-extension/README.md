@@ -2,7 +2,7 @@
 
 在编辑器里浏览、编辑团队研发记忆服务（team-memory）中的项目记忆：切换项目、看 RULE 索引、按主题/journal 浏览、直接改文件保存回服务、查看索引警告并执行 reindex。
 
-> 版本对应：插件 `0.1.6` 可连服务端 `0.1.1+`（当前服务端 `0.1.6`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
+> 版本对应：插件 `0.1.7` 可连服务端 `0.1.1+`（当前服务端 `0.1.6`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
 
 ## 安装
 
@@ -11,25 +11,25 @@
 ### VS Code
 
 1. 打开扩展面板（`Ctrl+Shift+X`）→ 右上角 `...` → **Install from VSIX...**
-2. 选择 `team-memory-0.1.6.vsix`
+2. 选择 `team-memory-0.1.7.vsix`
 3. 装完重载窗口（`Ctrl+Shift+P` → `Developer: Reload Window`）
 
 命令行方式（`code` 在 PATH 里时）：
 
 ```powershell
-code --install-extension .\team-memory-0.1.6.vsix
+code --install-extension .\team-memory-0.1.7.vsix
 ```
 
 ### Trae
 
 1. 打开扩展面板 → 右上角 `...` → **Install from VSIX...**
-2. 选择同一个 `team-memory-0.1.6.vsix`
+2. 选择同一个 `team-memory-0.1.7.vsix`
 3. 重载窗口
 
 如果 Trae 的安装目录下有命令行工具（`Trae.exe` / `trae.cmd`），也可以：
 
 ```powershell
-& "C:\path\to\Trae.exe" --install-extension .\team-memory-0.1.6.vsix
+& "C:\path\to\Trae.exe" --install-extension .\team-memory-0.1.7.vsix
 ```
 
 装好后左侧活动栏会出现「团队记忆」图标。
@@ -76,6 +76,7 @@ code --install-extension .\team-memory-0.1.6.vsix
 - **规则与索引**：`RULE.md`，打开即可编辑
 - **任务**：`TASKS.md`
 - **服务级规则（只读）**：`memory_get_rules` 返回的共用写入规范
+- **技能**：项目技能（`skills/<name>/SKILL.md`，可直接编辑）+ 全局技能（只读预览，来自 `get_rules.global_skills`）；默认创建的技能都是项目级，进全局要走提审
 - **主题**：`topics/*.md`
 - **Journal**：按 `YYYY-MM` 分组，每月第一项是索引
 - **索引警告**：未登记索引、索引指向的文件不存在、索引过大、索引行过长；点条目看处理建议
@@ -240,7 +241,7 @@ npx vsce package --no-dependencies --allow-missing-repository `
   --baseImagesUrl "https://github.com/try520/team-memory/raw/main/vscode-extension"
 ```
 
-`--baseContentUrl` 不能省：仓库主地址在 Gitee，vsce 自动检测不到 README 里相对链接的基准，不加会直接报错。产物是 `team-memory-0.1.6.vsix`（约 28 KB），已被 `.gitignore` 忽略，不进仓库。
+`--baseContentUrl` 不能省：仓库主地址在 Gitee，vsce 自动检测不到 README 里相对链接的基准，不加会直接报错。产物是 `team-memory-0.1.7.vsix`（约 28 KB），已被 `.gitignore` 忽略，不进仓库。
 
 调试：用 VS Code 打开 `vscode-extension` 目录，按 `F5` 启动扩展开发宿主。
 
@@ -251,16 +252,16 @@ npx vsce package --no-dependencies --allow-missing-repository `
 1. **本机安装（验证用）**
 
 ```powershell
-code --install-extension .\team-memory-0.1.6.vsix
+code --install-extension .\team-memory-0.1.7.vsix
 ```
 
 Trae 也一样：扩展面板右上角 `...` → **Install from VSIX...** 选文件，装完 `Ctrl+Shift+P` → `Developer: Reload Window`。
 
-2. **发给同事**：直接发 `team-memory-0.1.6.vsix`，对方用上面同样的方式安装。内网、访问不了市场时用这个。
+2. **发给同事**：直接发 `team-memory-0.1.7.vsix`，对方用上面同样的方式安装。内网、访问不了市场时用这个。
 
 3. **上架市场（可选，本仓库目前没做）**
    - VS Code Marketplace：`package.json` 补 `publisher`，在 Azure DevOps 申请带 Marketplace 权限的 Personal Access Token，然后 `npx vsce publish -p <token>`。
-   - Open VSX：`npx ovsx publish team-memory-0.1.6.vsix -p <token>`。
+   - Open VSX：`npx ovsx publish team-memory-0.1.7.vsix -p <token>`。
    - Trae 有自己的扩展市场，是否开放上传需查其开发者后台（未验证）。
 
 改版本号时要同步三处：`package.json` 的 `version`、`package-lock.json` 里根与 `packages[""]` 的 `version`、`src/client.ts` 的 `CLIENT_VERSION`。

@@ -206,20 +206,20 @@ qodercli mcp add -s project -t http team-memory-<project> \
 
 ### 第四步：添加客户端插件
 
-插件是标准 `.vsix`，VS Code 与 Trae 都能装。当前插件 `0.1.6`，可连服务端 `0.1.1+`（当前服务端 `0.1.6`）。
+插件是标准 `.vsix`，VS Code 与 Trae 都能装。当前插件 `0.1.7`，可连服务端 `0.1.1+`（当前服务端 `0.1.6`）。
 
 安装：
 
-1. 扩展面板 → 右上角 `...` → **Install from VSIX...** → 选 `team-memory-0.1.6.vsix`
+1. 扩展面板 → 右上角 `...` → **Install from VSIX...** → 选 `team-memory-0.1.7.vsix`
 2. 装完 `Ctrl+Shift+P` → `Developer: Reload Window`
 
 命令行方式（`code` 在 PATH 里时）：
 
 ```powershell
-code --install-extension .\team-memory-0.1.6.vsix
+code --install-extension .\team-memory-0.1.7.vsix
 ```
 
-vsix 不在仓库里（已被 `.gitignore` 排除）。自己构建见文末「开发与测试」，或向维护者要 `team-memory-0.1.6.vsix`。
+vsix 不在仓库里（已被 `.gitignore` 排除）。自己构建见文末「开发与测试」，或向维护者要 `team-memory-0.1.7.vsix`。
 
 装好后在 `settings.json` 里填服务地址（**不要带 `/mcp`**）：
 

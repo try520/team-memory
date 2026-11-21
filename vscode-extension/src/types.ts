@@ -19,6 +19,15 @@ export interface JournalWindow {
   files: number;
 }
 
+export interface SkillInfo {
+  scope: 'project' | 'global';
+  name: string;
+  description: string;
+  status: 'local' | 'pending' | 'approved' | string;
+  source_project?: string;
+  path: string;
+}
+
 export interface RulesResp {
   project: string;
   rule_hash: string;
@@ -30,6 +39,7 @@ export interface RulesResp {
   files: FileInfo[];
   journal_index: string[];
   warnings: IndexWarning[];
+  global_skills?: SkillInfo[];
   journal_window: JournalWindow;
   last_write?: string;
   days_since_write: number;

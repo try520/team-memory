@@ -13,7 +13,7 @@ import {
 
 export const PROTOCOL = '2025-06-18';
 const CLIENT_NAME = 'team-memory-vscode';
-const CLIENT_VERSION = '0.1.6';
+const CLIENT_VERSION = '0.1.7';
 
 /** 工具级错误（HTTP/JSON-RPC 都成功，result.isError=true）。 */
 export class ToolError extends Error {
