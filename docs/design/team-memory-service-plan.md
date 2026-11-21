@@ -26,7 +26,7 @@
                                        RULE.md（索引地图）
                                        TASKS.md
                                        topics/<主题>.md
-                                       journal/2026-11/<姓名>-<hhmmss>.md
+                                       journal/2026-11/<姓名>-<标题>-<hhmmss>.md
                                        journal/2026-11.INDEX.md（一行一次会话）
 ```
 
@@ -87,7 +87,7 @@ projects/<slug>/
    找不到对应主题才新建，新建必须同时给 `index.scene` 与 `index.examples`，例如
    `{"scene":"涉及退款、部分退款、退款回调的改动前必读","examples":["部分退款怎么退？","退款回调失败会重试几次？"]}`。
 5. 新结论与旧结论冲突时：新结论写在前，旧结论保留并标 `（已废弃 2026-11-16，原因：…）`，不要整段删除。
-6. 会话收尾写 journal（`journal/YYYY-MM/` 下任意 `.md`，服务端改名为 `<姓名>-<hhmmss>.md`，≤300 字）；本次确实无事可记就写
+6. 会话收尾写 journal（`journal/YYYY-MM/` 下任意 `.md`，服务端改名为 `<姓名>-<标题>-<hhmmss>.md`，≤300 字）；本次确实无事可记就写
    「本次无需记录：<原因>」——沉默无法区分「判断过」和「忘了」。
 7. 索引里的行与 `topics/` 对不上时：缺行用 `mode=reindex` 补（只补不删）；有行无文件先确认，再人工删行。
 
@@ -261,7 +261,7 @@ projects/<slug>/
 
 ### 6.4 journal 索引（服务端自动维护，零模型负担）
 
-- 写 `journal/2026-11/` 下任意 `.md` 时，服务端改名为 `<姓名>-<hhmmss>.md` 并向 `journal/2026-11.INDEX.md` 自动追加一行：
+- 写 `journal/2026-11/` 下任意 `.md` 时，服务端改名为 `<姓名>-<标题>-<hhmmss>.md` 并向 `journal/2026-11.INDEX.md` 自动追加一行：
   `| 2026-11-16 | zhangsan | 回调重复扣款已定位到幂等键缺失 | zhangsan-101502.md |`
 - 摘要取 journal 文件第一个 `#`/`##` 标题或首行前 40 字；`get_rules` 返回 `journal_index` 指向当月与上月两个文件。
 - 作用：替代「按关键词搜历史」，模型先看月度索引的一句话，再决定读哪篇 journal。

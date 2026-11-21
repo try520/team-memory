@@ -331,6 +331,70 @@ func TestIndexWarningsAndJournalIndex(t *testing.T) {
 	}
 }
 
+func TestJournalFileNameKeepsTitle(t *testing.T) {
+	svc := newSvc(t)
+	rules := mustRules(t, svc, "demo")
+	ym := time.Now().Format("2006-01")
+
+	// 1. 调用方给的名字带 -HHMM：标题保留，服务端换成自己的 hhmmss
+	w1, e := svc.Write("demo", WriteReq{
+		Path: "journal/" + ym + "/模板刷新自动注册-1630.md", Mode: "create", Session: rules.Session,
+		Content: "# 模板刷新自动注册\n刷新后自动注册缺失模板。\n",
+	})
+	if e != nil {
+		t.Fatalf("write1: %v", e)
+	}
+	if !strings.HasPrefix(w1.Path, "journal/"+ym+"/"+rules.Session+"-") || !strings.Contains(w1.Path, "-模板刷新自动注册-") {
+		t.Fatalf("文件名应为 <会话标签>-<标题>-<hhmmss>: %s", w1.Path)
+	}
+
+	// 2. 已经是 <作者>-<hhmmss> 形态：去掉时间后与作者相同，退回正文首行作标题
+	w2, e := svc.Write("demo", WriteReq{
+		Path: "journal/" + ym + "/" + rules.Session + "-141724.md", Mode: "create", Session: rules.Session,
+		Content: "# 修复登录超时\n会话续期逻辑漏了刷新。\n",
+	})
+	if e != nil {
+		t.Fatalf("write2: %v", e)
+	}
+	if !strings.Contains(w2.Path, "-修复登录超时-") {
+		t.Fatalf("标题应退回正文首行: %s", w2.Path)
+	}
+
+	// 3. 月度索引第四列登记的是规范化后的文件名
+	ji, _, err := svc.st.ReadFile("demo", "journal/"+ym+".INDEX.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base1 := filepath.Base(w1.Path)
+	if !strings.Contains(string(ji), base1) || !strings.Contains(string(ji), "模板刷新自动注册") {
+		t.Fatalf("索引未登记新文件名 %s:\n%s", base1, ji)
+	}
+}
+
+func TestGetRulesReturnsTaskRows(t *testing.T) {
+	svc := newSvc(t)
+	mustRules(t, svc, "demo")
+
+	tasks := "# 任务\n\n| 任务 | 状态 | 下一步 | 涉及文件 | 推进者（自报） | 更新时间 |\n" +
+		"| --- | --- | --- | --- | --- | --- |\n" +
+		"| 修支付回调 | 进行中 | 补单测 | api/pay.go、api/order.go | 张三 | 2026-11-21 14:00 |\n"
+	if e := svc.st.WriteAtomic("demo", "TASKS.md", []byte(tasks)); e != nil {
+		t.Fatal(e)
+	}
+
+	rules := mustRules(t, svc, "demo")
+	if len(rules.Tasks) != 1 {
+		t.Fatalf("get_rules.tasks 应有 1 行，得到 %d: %+v", len(rules.Tasks), rules.Tasks)
+	}
+	row := rules.Tasks[0]
+	if row.Task != "修支付回调" || row.Owner != "张三" || row.Status != "进行中" {
+		t.Fatalf("行解析不对: %+v", row)
+	}
+	if len(row.Files) != 2 || row.Files[0] != "api/pay.go" || row.Files[1] != "api/order.go" {
+		t.Fatalf("涉及文件解析不对: %+v", row.Files)
+	}
+}
+
 func TestRecordReminderAndNextHints(t *testing.T) {
 	svc := newSvc(t)
 	rules := mustRules(t, svc, "demo")

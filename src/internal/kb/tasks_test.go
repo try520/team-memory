@@ -282,16 +282,16 @@ func TestJournalFileNameFromUserName(t *testing.T) {
 	if e != nil {
 		t.Fatalf("journal: %v", e)
 	}
-	if resp.Path != "journal/2026-11/Zhang 三 x-103000.md" {
+	if resp.Path != "journal/2026-11/Zhang 三 x-命名-103000.md" {
 		t.Fatalf("文件名清洗结果不对: %s", resp.Path)
 	}
 
-	// 同一人同一秒再写 → -2 去重。
+	// 同一人、同一标题、同一秒再写 → -2 去重。
 	resp, e = svc.Write("demo", WriteReq{
 		Path: "journal/2026-11/whatever.md", Mode: "create", Session: rules.Session, UserName: "Zhang 三 /x",
-		Content: "# 命名2\n结论。\n",
+		Content: "# 命名\n补充结论。\n",
 	})
-	if e != nil || resp.Path != "journal/2026-11/Zhang 三 x-103000-2.md" {
+	if e != nil || resp.Path != "journal/2026-11/Zhang 三 x-命名-103000-2.md" {
 		t.Fatalf("同名去重失败: %+v %v", resp, e)
 	}
 
@@ -300,7 +300,7 @@ func TestJournalFileNameFromUserName(t *testing.T) {
 		Path: "journal/2026-11/whatever.md", Mode: "create", Session: rules.Session,
 		Content: "# 回落\n结论。\n",
 	})
-	if e != nil || resp.Path != "journal/2026-11/"+rules.Session+"-103000.md" {
+	if e != nil || resp.Path != "journal/2026-11/"+rules.Session+"-回落-103000.md" {
 		t.Fatalf("缺省应回落会话标签: %+v %v", resp, e)
 	}
 

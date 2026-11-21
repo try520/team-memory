@@ -2,7 +2,7 @@
   "name": "team-memory",
   "displayName": "团队记忆",
   "description": "浏览与编辑团队研发记忆服务（team-memory）中的项目记忆：项目切换、文件树、索引警告、编辑保存。",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "try520",
   "license": "MIT",
   "repository": {

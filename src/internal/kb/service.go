@@ -90,7 +90,9 @@ type RulesResp struct {
 	Files          []FileInfo `json:"files"`
 	JournalIndex   []string   `json:"journal_index"`
 	Warnings       []Warning  `json:"warnings"`
-	JournalWindow  Window     `json:"journal_window"`
+	// Tasks 是 TASKS.md 的当前内容（六列解析后），用于开工前判断文件是否已被别人占用。
+	Tasks         []TaskRow `json:"tasks"`
+	JournalWindow Window    `json:"journal_window"`
 	// LastWrite / DaysSinceWrite / RecordReminder 用于提醒「该写回了」：
 	// 只看 topics/ 与 journal/ 的记录，模板文件不算。
 	LastWrite      string `json:"last_write,omitempty"`
@@ -284,6 +286,12 @@ func (s *Service) GetRulesAs(slug, paramUser, headerUser string) (*RulesResp, *E
 		return nil, ge
 	}
 
+	// TASKS.md 直接回显，省掉一次 memory_read；文件不存在时返回空数组。
+	tasks := make([]TaskRow, 0, 4)
+	if tb, _, terr := s.st.ReadFile(slug, "TASKS.md"); terr == nil {
+		tasks = ParseTasks(string(tb))
+	}
+
 	name, nameSource, ue := ResolveUserName(paramUser, headerUser, sid)
 	if ue != nil {
 		return nil, ue
@@ -299,6 +307,7 @@ func (s *Service) GetRulesAs(slug, paramUser, headerUser string) (*RulesResp, *E
 		Files:          files,
 		JournalIndex:   s.journalIndexFiles(slug, now),
 		Warnings:       s.warnings(slug, string(rule)),
+		Tasks:          tasks,
 		JournalWindow: Window{
 			From:  from.Format("2006-01-02"),
 			To:    now.Format("2006-01-02"),
@@ -485,10 +494,10 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 			"全局技能只能经 skill_promote(action=submit) 提交并审批；修改项目技能请用 skills/<name>/SKILL.md。")
 	}
 
-	// journal 文件名由服务端统一为 <姓名或会话标签>-<hhmmss>.md，保证「谁写的」一眼可见；
-	// 仅对 create 生效，append/replace 仍按调用方给出的路径。
+	// journal 文件名由服务端统一为 <姓名或会话标签>-<标题>-<hhmmss>.md：保留调用方给的标题，
+	// 让文件名能看出「谁、做了什么」；仅对 create 生效，append/replace 仍按调用方给出的路径。
 	if req.Mode == "create" && isJournalPath(rel) {
-		rel = s.journalPath(slug, rel, authorName(req.UserName, req.Session))
+		rel = s.journalPath(slug, rel, authorName(req.UserName, req.Session), req.Content)
 	}
 
 	unlock := s.st.Lock(slug + "|" + rel)
@@ -802,15 +811,21 @@ func authorName(userName, session string) string {
 	return session
 }
 
-// journalPath 把 journal 路径改写成 journal/<YYYY-MM>/<作者>-<hhmmss>.md；
-// 同一作者同一秒重复写入时追加 -2、-3 去重。
-func (s *Service) journalPath(slug, rel, author string) string {
+// journalPath 把 journal 路径改写成 journal/<YYYY-MM>/<作者>-<标题>-<hhmmss>.md。
+// 标题取自调用方给的文件名（去掉尾部 -HHMM / -HHMMSS），为空则退回正文首行；
+// 这样文件名能看出「谁、做了什么」，而不是只剩一串时间。同一作者同一秒重名时追加 -2、-3。
+func (s *Service) journalPath(slug, rel, author, content string) string {
 	parts := strings.Split(strings.TrimPrefix(rel, "journal/"), "/")
 	if len(parts) != 2 || !isYearMonth(parts[0]) {
 		return rel
 	}
 	ym := parts[0]
-	base := sanitizeFilePart(author) + "-" + s.now().Format("150405")
+	owner := sanitizeFilePart(author)
+	base := owner
+	if title := journalTitle(parts[1], content, owner); title != "" {
+		base += "-" + title
+	}
+	base += "-" + s.now().Format("150405")
 	candidate := "journal/" + ym + "/" + base + ".md"
 	for i := 2; ; i++ {
 		if _, _, err := s.st.ReadFile(slug, candidate); err != nil {
@@ -820,22 +835,67 @@ func (s *Service) journalPath(slug, rel, author string) string {
 	}
 }
 
-// sanitizeFilePart 只做最小清洗：去掉路径分隔符、控制字符和会破坏表格/路径的字符，
-// 保留中文与内部空格；清洗后为空则用 anon 兜底。
-func sanitizeFilePart(author string) string {
+// journalTitle 从调用方给的文件名里取标题：去掉 .md 和尾部时间（-1015 / -101530）；
+// 结果为空、只是作者本人、或是 tmp/whatever 这类占位名时，退回正文首行；仍为空就不加标题段。
+func journalTitle(name, content, owner string) string {
+	stem := stripTrailingTime(strings.TrimSuffix(name, ".md"))
+	title := cleanFilePart(stem)
+	if title == owner || journalGenericNames[strings.ToLower(title)] {
+		title = ""
+	}
+	if title == "" {
+		title = cleanFilePart(summarize([]byte(content)))
+		if title == owner {
+			title = ""
+		}
+	}
+	return truncateRunes(title, 24)
+}
+
+// journalGenericNames 是常见的占位文件名，遇到时改用正文首行，避免出现 xxx-141724.md 这种。
+var journalGenericNames = map[string]bool{
+	"whatever": true, "tmp": true, "temp": true, "test": true, "untitled": true,
+	"journal": true, "note": true, "log": true, "xxx": true, "new": true, "无标题": true,
+}
+
+// stripTrailingTime 去掉文件名末尾的 4 位 HHMM 或 6 位 HHMMSS。
+func stripTrailingTime(name string) string {
+	i := strings.LastIndex(name, "-")
+	if i <= 0 {
+		return name
+	}
+	tail := name[i+1:]
+	if len(tail) != 4 && len(tail) != 6 {
+		return name
+	}
+	for _, r := range tail {
+		if r < '0' || r > '9' {
+			return name
+		}
+	}
+	return name[:i]
+}
+
+// cleanFilePart 只做最小清洗：去掉路径分隔符、控制字符和会破坏表格/路径的字符，
+// 保留中文与内部空格；结果为空时返回空串，由调用方决定兜底。
+func cleanFilePart(s string) string {
 	var b strings.Builder
-	for _, r := range author {
+	for _, r := range s {
 		if r == '/' || r == '\\' || r == '|' || r == ':' || r == '*' || r == '?' ||
 			r == '"' || r == '<' || r == '>' || unicode.IsControl(r) {
 			continue
 		}
 		b.WriteRune(r)
 	}
-	name := strings.Trim(strings.TrimSpace(b.String()), ".")
-	if name == "" {
-		return "anon"
+	return strings.Trim(strings.TrimSpace(b.String()), ".")
+}
+
+// sanitizeFilePart 是 cleanFilePart 的兜底版：清洗后为空则用 anon。
+func sanitizeFilePart(author string) string {
+	if name := cleanFilePart(author); name != "" {
+		return truncateRunes(name, 32)
 	}
-	return truncateRunes(name, 32)
+	return "anon"
 }
 
 func isYearMonth(s string) bool {

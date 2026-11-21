@@ -8,11 +8,12 @@ func toolDefs() []any {
 			"name":  "memory_get_rules",
 			"title": "读取项目规则与索引",
 			"description": "在任何读取或写入之前先调用。返回服务级规则、项目 RULE.md 索引全文、文件清单、索引体检 warnings、" +
-				"当月/上月 journal 索引、距上次记录的天数（last_write / days_since_write / record_reminder），以及写入所需的 session。" +
+				"TASKS.md 当前占用表 tasks[]（task/status/next/files/owner/updated）、当月/上月 journal 索引、距上次记录的天数（last_write / days_since_write / record_reminder），以及写入所需的 session。" +
+				"开工前看 tasks：要改的文件若已出现在别人的行里，先说明再避开或沟通，不必为了看占用再单独 memory_read TASKS.md。" +
 				"用返回索引里的「适用场景/举例」决定先读哪些最相关的主题文档，覆盖本次要碰的代码和数据即停，不够再继续；不必一次读完整 topics/ 目录。" +
 				"服务端会回显 user_name 与 user_name_source（param / header / session）：姓名通常来自客户端配置的 X-Memory-User 请求头，" +
 				"通常无需在工具参数里重复传；仅临时改用别的名字时才传 userName。" +
-				"返回结构：{project, rule_hash, session, user_name, user_name_source, service_rule, index, files[], journal_index[], warnings[], journal_window, last_write, days_since_write, record_reminder}。",
+				"返回结构：{project, rule_hash, session, user_name, user_name_source, service_rule, index, files[], tasks[], journal_index[], warnings[], journal_window, last_write, days_since_write, record_reminder}。",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -53,7 +54,7 @@ func toolDefs() []any {
 				"reindex 只作用于 RULE.md，为 topics/ 下没登记的主题补默认行（行尾 <!-- auto -->），不删任何已有行。" +
 				"新建 topics/ 下的主题必须同时给 index.scene（什么场景必须读，≤120 字）与 index.examples（2~3 个真实提问），" +
 				"否则返回 409 INDEX_ROW_REQUIRED；服务端会把索引行按固定格式插入 RULE.md。写 journal/YYYY-MM/ 下的 .md 时，" +
-				"服务端会自动改名为 <姓名>-<hhmmss>.md（无名则用会话标签）并向当月 journal 索引追加一行。返回结构：{ok, path, hash, lines, index_updated, warnings?, hint?, next}；" +
+				"服务端会自动改名为 <姓名>-<标题>-<hhmmss>.md（无名则用会话标签；标题取自你给的文件名，占位名退回正文首行）并向当月 journal 索引追加一行。返回结构：{ok, path, hash, lines, index_updated, warnings?, hint?, next}；" +
 				"TASKS.md 是开工前计划 + 文件占用表（六列：任务/状态/下一步/涉及文件/推进者/更新时间）：规划完成后先写计划再改代码，" +
 				"改文件前先读 TASKS.md 看有没有别的会话登记同一文件，做完立刻删行；服务端只在 warnings 提示冲突、不阻断，" +
 				"这是自报约定而非锁，兜底是按文件串行 + expectedHash。" +
@@ -64,7 +65,7 @@ func toolDefs() []any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"path": map[string]any{"type": "string", "description": "项目内相对路径：RULE.md、TASKS.md、topics/**.md、journal/YYYY-MM/<任意名>.md（服务端会改名为 <姓名>-<hhmmss>.md）"},
+					"path": map[string]any{"type": "string", "description": "项目内相对路径：RULE.md、TASKS.md、topics/**.md、journal/YYYY-MM/<标题>.md（服务端会改名为 <姓名>-<标题>-<hhmmss>.md，文件名请写这次做了什么）"},
 					"content": map[string]any{"type": "string",
 						"description": "写入内容（md）。create/replace 是完整正文，append 是要追加的片段；reindex 时忽略"},
 					"mode": map[string]any{"type": "string", "enum": []string{"create", "append", "replace", "reindex"},

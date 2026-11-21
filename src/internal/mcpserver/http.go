@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	Version         = "0.1.5"
+	Version         = "0.1.6"
 	DefaultProtocol = "2025-06-18"
 	SessionHeader   = "Mcp-Session-Id"
 	ProtocolHeader  = "MCP-Protocol-Version"
@@ -322,8 +322,9 @@ func (s *Server) handleMessage(req *rpcRequest, project string, r *http.Request)
 					"技能：用户说「根据之前的操作生成 xx 技能」用 memory_write 写 skills/<name>/SKILL.md（frontmatter 含 name/description）；" +
 					"「修改 / 完善 xx 技能」用 memory_write 的 append/replace；「把 xx 技能提升为全局技能」用 skill_promote(action=submit) 提审，" +
 					"再由维护者 approve；全局技能会自动列在各项目 get_rules 的 global_skills 中，可用 skill_list 查看。" +
-					"协作：规划完成后、改代码前先把计划写进 TASKS.md（六列，含涉及文件）；改文件前先读 TASKS.md 看是否被其他会话登记，" +
-					"有就避开或沟通，做完立刻删行。服务端只在 warnings 里提示冲突，不阻断；这不是锁，兜底是按文件串行 + expectedHash。" +
+					"协作：get_rules 返回的 tasks 就是 TASKS.md 的当前六列表（谁、在做什么、占了哪些文件），不用再单独读；" +
+					"只要本次任务要改 1 个及以上文件，就先 memory_write 在 TASKS.md 登记一行（任务/状态/下一步/涉及文件），再动代码；" +
+					"要改的文件若已出现在 tasks 里别人的行，先说明并避开或沟通；做完立刻删掉自己那行。服务端只在 warnings 里提示 TASK_CONFLICT，不阻断；这不是锁，兜底是按文件串行 + expectedHash。" +
 					"开发者姓名由客户端在 MCP 配置的 X-Memory-User 请求头里提供，通常不需要在工具参数里重复传；" +
 					"仅当本次要临时改用别的名字时，才在 memory_write 里传 userName（优先级：参数 > 请求头 > 会话标签）。" +
 					"它是自报信息，不是身份认证，不能用于追责；不知道就不要编。get_rules 会回显 user_name 与 user_name_source，按它确认即可。",

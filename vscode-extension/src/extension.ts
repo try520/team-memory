@@ -360,8 +360,8 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
         ignoreFocusOut: true,
       })) || '';
 
-    const { ym, hhmm } = nowParts();
-    const base = `journal/${ym}/${safeName(label)}-${hhmm}`;
+    const { ym } = nowParts();
+    const base = `journal/${ym}/${safeName(label)}`;
     let written = '';
 
     for (let i = 0; i < 5 && !written; i++) {
@@ -372,14 +372,14 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
           content: `# ${label.trim()}\n\n${note.trim()}\n`,
           mode: 'create',
         });
-        // 服务端会把 journal 文件名改为 <姓名或会话标签>-<hhmmss>.md，以返回的 path 为准。
+        // 服务端会把 journal 文件名改为 <姓名或会话标签>-<标题>-<hhmmss>.md，以返回的 path 为准。
         written = resp.path || rel;
       } catch (e) {
         if (e instanceof ToolError && e.code === 'ALREADY_EXISTS') continue;
         throw e;
       }
     }
-    if (!written) throw new Error('同一分钟已有同名 journal，换个标题再试。');
+    if (!written) throw new Error('同一秒已有同名 journal，换个标题再试。');
 
     void vscode.window.showInformationMessage(`已写入 ${written}`);
     await this.refresh(true);

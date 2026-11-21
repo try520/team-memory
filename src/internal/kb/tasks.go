@@ -211,6 +211,52 @@ func tasksConflicts(content, rel, session, userName string) []Warning {
 	return out
 }
 
+// TaskRow 是 TASKS.md 的一行（六列）。随 get_rules 返回，模型不用额外读文件
+// 就能看到「谁在做什么、占了哪些文件」，这是发现占用的入口。
+type TaskRow struct {
+	Task    string   `json:"task"`
+	Status  string   `json:"status"`
+	Next    string   `json:"next"`
+	Files   []string `json:"files"`
+	Owner   string   `json:"owner"`
+	Updated string   `json:"updated"`
+}
+
+// ParseTasks 解析 TASKS.md 的表格行；表头、分隔行、空行和列数不足的行跳过。
+// 最多返回 50 行，避免表格异常膨胀时把 get_rules 撑大。
+func ParseTasks(content string) []TaskRow {
+	out := make([]TaskRow, 0, 4)
+	seen := false
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !seen {
+			if isTasksHeaderRow(trimmed) {
+				seen = true
+			}
+			continue
+		}
+		if trimmed == "" || !strings.HasPrefix(trimmed, "|") || isTasksHeaderRow(trimmed) || isSepRow(trimmed) {
+			continue
+		}
+		cells := splitRow(trimmed)
+		if len(cells) < 6 || cells[0] == "" {
+			continue
+		}
+		out = append(out, TaskRow{
+			Task:    cells[0],
+			Status:  cells[1],
+			Next:    cells[2],
+			Files:   splitFileList(cells[3]),
+			Owner:   cells[4],
+			Updated: cells[5],
+		})
+		if len(out) >= 50 {
+			break
+		}
+	}
+	return out
+}
+
 // splitFileList 拆分「涉及文件」单元格：支持中英文逗号、顿号与分号。
 func splitFileList(cell string) []string {
 	fields := strings.FieldsFunc(cell, func(r rune) bool {
