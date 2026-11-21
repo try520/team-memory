@@ -13,7 +13,7 @@ import {
 
 export const PROTOCOL = '2025-06-18';
 const CLIENT_NAME = 'team-memory-vscode';
-const CLIENT_VERSION = '0.1.7';
+const CLIENT_VERSION = '0.1.8';
 
 /** 工具级错误（HTTP/JSON-RPC 都成功，result.isError=true）。 */
 export class ToolError extends Error {
@@ -98,7 +98,6 @@ export class MemoryClient {
   readonly serverUrl: string;
   readonly project: string;
   readonly timeout: number;
-  readonly userName: string;
   private mcpSession = '';
   private ruleSession = '';
   private seq = 0;
@@ -106,11 +105,10 @@ export class MemoryClient {
   lastRules: RulesResp | null = null;
   serverVersion = '';
 
-  constructor(opts: { serverUrl: string; project: string; timeout?: number; userName?: string }) {
+  constructor(opts: { serverUrl: string; project: string; timeout?: number }) {
     this.serverUrl = opts.serverUrl.replace(/\/+$/, '');
     this.project = opts.project;
     this.timeout = opts.timeout || 15000;
-    this.userName = (opts.userName || '').trim();
   }
 
   get mcpUrl(): string {
@@ -126,9 +124,6 @@ export class MemoryClient {
       'Content-Type': 'application/json',
       Accept: 'application/json, text/event-stream',
     };
-    if (this.userName) {
-      h['X-Memory-User'] = this.userName;
-    }
     if (this.mcpSession) {
       h['Mcp-Session-Id'] = this.mcpSession;
       h['MCP-Protocol-Version'] = PROTOCOL;

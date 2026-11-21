@@ -2,7 +2,7 @@
 
 在编辑器里浏览、编辑团队研发记忆服务（team-memory）中的项目记忆：切换项目、看 RULE 索引、按主题/journal 浏览、直接改文件保存回服务、查看索引警告并执行 reindex。
 
-> 版本对应：插件 `0.1.7` 可连服务端 `0.1.1+`（当前服务端 `0.1.7`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
+> 版本对应：插件 `0.1.8` 可连服务端 `0.1.1+`（当前服务端 `0.1.7`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
 
 ## 安装
 
@@ -11,25 +11,25 @@
 ### VS Code
 
 1. 打开扩展面板（`Ctrl+Shift+X`）→ 右上角 `...` → **Install from VSIX...**
-2. 选择 `team-memory-0.1.7.vsix`
+2. 选择 `team-memory-0.1.8.vsix`
 3. 装完重载窗口（`Ctrl+Shift+P` → `Developer: Reload Window`）
 
 命令行方式（`code` 在 PATH 里时）：
 
 ```powershell
-code --install-extension .\team-memory-0.1.7.vsix
+code --install-extension .\team-memory-0.1.8.vsix
 ```
 
 ### Trae
 
 1. 打开扩展面板 → 右上角 `...` → **Install from VSIX...**
-2. 选择同一个 `team-memory-0.1.7.vsix`
+2. 选择同一个 `team-memory-0.1.8.vsix`
 3. 重载窗口
 
 如果 Trae 的安装目录下有命令行工具（`Trae.exe` / `trae.cmd`），也可以：
 
 ```powershell
-& "C:\path\to\Trae.exe" --install-extension .\team-memory-0.1.7.vsix
+& "C:\path\to\Trae.exe" --install-extension .\team-memory-0.1.8.vsix
 ```
 
 装好后左侧活动栏会出现「团队记忆」图标。
@@ -42,8 +42,7 @@ code --install-extension .\team-memory-0.1.7.vsix
 {
   "teamMemory.serverUrl": "http://<your-server>:8080",
   "teamMemory.autoConnect": true,
-  "teamMemory.requestTimeoutMs": 15000,
-  "teamMemory.userName": "张三"
+  "teamMemory.requestTimeoutMs": 15000
 }
 ```
 
@@ -52,7 +51,6 @@ code --install-extension .\team-memory-0.1.7.vsix
 | `teamMemory.serverUrl` | 记忆服务地址，默认 `http://127.0.0.1:8080`，**不要带 `/mcp`** |
 | `teamMemory.autoConnect` | 启动时自动连接并读取索引 |
 | `teamMemory.requestTimeoutMs` | 单次请求超时（毫秒） |
-| `teamMemory.userName` | 你的名字（自报，不是身份认证），作为 `X-Memory-User` 头带给服务端，用于 TASKS 推进者与 journal 文件名；留空回落到会话标签。切换项目不会丢 |
 
 项目**不在设置里配**：在侧边栏标题栏的「切换项目」里选，选择结果按工作区记住（存在工作区状态里，不写 `settings.json`）。旧版本的 `teamMemory.project` 已废弃，留在 `settings.json` 里也不会生效，可以删掉。
 
@@ -99,7 +97,7 @@ code --install-extension .\team-memory-0.1.7.vsix
 
 ### 写 journal / 加任务
 
-- `团队记忆: 写 journal`：写入 `journal/<YYYY-MM>/` 下的日志，服务端会改名为 `<姓名或会话标签>-<标题>-<hhmmss>.md`（姓名取插件配置 `teamMemory.userName`，未配置则用会话标签；标题就是你填的那句话），并自动出现在当月索引里
+- `团队记忆: 写 journal`：写入 `journal/<YYYY-MM>/` 下的日志，服务端会改名为 `<姓名或会话标签>-<标题>-<hhmmss>.md`（姓名来自 MCP 配置的 `X-Memory-User`，插件本身不再单独配置名字；标题就是你填的那句话），并自动出现在当月索引里
 - `团队记忆: 添加任务`：向 `TASKS.md` 追加一条 `- [ ] ...` 清单项。它是普通待办，不参与六列「涉及文件」占用登记；要登记涉及文件、让别人看到占用，请在对话里用 `memory_write` 写表格行
 
 ### 索引警告与 reindex
@@ -211,7 +209,7 @@ tar czf memory-$(date +%F).tgz -C ./data .
 
 客户端（Trae / Claude Code / Qoder / CodeBuddy）的项目级配置统一维护在根 README 的 [MCP 接入](../README.md#mcp-接入) 一节，含文件路径、可复制 JSON、`X-Memory-User` 头与连接确认方法。这里不再重复，避免两处漂移。
 
-插件本身只需要配置 `teamMemory.userName`（见上方设置表）：它会作为 `X-Memory-User` 头带给服务端，写 journal 和建主题时不用再手填名字；留空则回落到会话标签。
+插件本身不需要配置名字：需要自报姓名时，统一在 MCP 客户端配置里加 `X-Memory-User` 头（见根 README）。插件直接连服务，不读取客户端那份配置，所以插件发起写入时若没有名字，会回落到会话标签。
 
 ### 元数据端点 `/mcp`（只用来核对，不要配成 MCP 服务器）
 
@@ -241,7 +239,7 @@ npx vsce package --no-dependencies --allow-missing-repository `
   --baseImagesUrl "https://github.com/try520/team-memory/raw/main/vscode-extension"
 ```
 
-`--baseContentUrl` 不能省：仓库主地址在 Gitee，vsce 自动检测不到 README 里相对链接的基准，不加会直接报错。产物是 `team-memory-0.1.7.vsix`（约 28 KB），已被 `.gitignore` 忽略，不进仓库。
+`--baseContentUrl` 不能省：仓库主地址在 Gitee，vsce 自动检测不到 README 里相对链接的基准，不加会直接报错。产物是 `team-memory-0.1.8.vsix`（约 28 KB），已被 `.gitignore` 忽略，不进仓库。
 
 调试：用 VS Code 打开 `vscode-extension` 目录，按 `F5` 启动扩展开发宿主。
 
@@ -252,16 +250,16 @@ npx vsce package --no-dependencies --allow-missing-repository `
 1. **本机安装（验证用）**
 
 ```powershell
-code --install-extension .\team-memory-0.1.7.vsix
+code --install-extension .\team-memory-0.1.8.vsix
 ```
 
 Trae 也一样：扩展面板右上角 `...` → **Install from VSIX...** 选文件，装完 `Ctrl+Shift+P` → `Developer: Reload Window`。
 
-2. **发给同事**：直接发 `team-memory-0.1.7.vsix`，对方用上面同样的方式安装。内网、访问不了市场时用这个。
+2. **发给同事**：直接发 `team-memory-0.1.8.vsix`，对方用上面同样的方式安装。内网、访问不了市场时用这个。
 
 3. **上架市场（可选，本仓库目前没做）**
    - VS Code Marketplace：`package.json` 补 `publisher`，在 Azure DevOps 申请带 Marketplace 权限的 Personal Access Token，然后 `npx vsce publish -p <token>`。
-   - Open VSX：`npx ovsx publish team-memory-0.1.7.vsix -p <token>`。
+   - Open VSX：`npx ovsx publish team-memory-0.1.8.vsix -p <token>`。
    - Trae 有自己的扩展市场，是否开放上传需查其开发者后台（未验证）。
 
 改版本号时要同步三处：`package.json` 的 `version`、`package-lock.json` 里根与 `packages[""]` 的 `version`、`src/client.ts` 的 `CLIENT_VERSION`。

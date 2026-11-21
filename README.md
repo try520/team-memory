@@ -206,20 +206,20 @@ qodercli mcp add -s project -t http team-memory-<project> \
 
 ### 第四步：添加客户端插件
 
-插件是标准 `.vsix`，VS Code 与 Trae 都能装。当前插件 `0.1.7`，可连服务端 `0.1.1+`（当前服务端 `0.1.7`）。
+插件是标准 `.vsix`，VS Code 与 Trae 都能装。当前插件 `0.1.8`，可连服务端 `0.1.1+`（当前服务端 `0.1.7`）。
 
 安装：
 
-1. 扩展面板 → 右上角 `...` → **Install from VSIX...** → 选 `team-memory-0.1.7.vsix`
+1. 扩展面板 → 右上角 `...` → **Install from VSIX...** → 选 `team-memory-0.1.8.vsix`
 2. 装完 `Ctrl+Shift+P` → `Developer: Reload Window`
 
 命令行方式（`code` 在 PATH 里时）：
 
 ```powershell
-code --install-extension .\team-memory-0.1.7.vsix
+code --install-extension .\team-memory-0.1.8.vsix
 ```
 
-vsix 不在仓库里（已被 `.gitignore` 排除）。自己构建见文末「开发与测试」，或向维护者要 `team-memory-0.1.7.vsix`。
+vsix 不在仓库里（已被 `.gitignore` 排除）。自己构建见文末「开发与测试」，或向维护者要 `team-memory-0.1.8.vsix`。
 
 装好后在 `settings.json` 里填服务地址（**不要带 `/mcp`**）：
 
@@ -227,12 +227,11 @@ vsix 不在仓库里（已被 `.gitignore` 排除）。自己构建见文末「�
 {
   "teamMemory.serverUrl": "http://<your-server>:8080",
   "teamMemory.autoConnect": true,
-  "teamMemory.requestTimeoutMs": 15000,
-  "teamMemory.userName": "张三"
+  "teamMemory.requestTimeoutMs": 15000
 }
 ```
 
-- `teamMemory.userName` 会作为 `X-Memory-User` 头带给服务端，写 journal 和 TASKS 时不用再手填名字；留空回落到会话标签。
+- 名字不在这里配：插件直接连服务，不读 MCP 客户端那份配置；需要自报姓名时在 MCP 客户端加 `X-Memory-User` 头。
 - 项目在侧边栏「切换项目」里选，按工作区记住，不写进 `settings.json`。
 - 完整功能（索引警告、reindex、新建主题、写 journal）见 [vscode-extension/README.md](vscode-extension/README.md)。
 

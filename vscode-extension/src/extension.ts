@@ -15,7 +15,6 @@ interface Config {
   serverUrl: string;
   autoConnect: boolean;
   timeout: number;
-  userName: string;
 }
 
 /** 当前项目只记在 workspaceState（每个工作区各一份），不写用户设置。 */
@@ -115,7 +114,6 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
       serverUrl: (c.get<string>('serverUrl') || 'http://127.0.0.1:8080').trim().replace(/\/+$/, ''),
       autoConnect: c.get<boolean>('autoConnect') ?? true,
       timeout: c.get<number>('requestTimeoutMs') || 15000,
-      userName: (c.get<string>('userName') || '').trim(),
     };
   }
 
@@ -129,11 +127,10 @@ class TeamMemoryExtension implements vscode.Disposable, MemoryFsHost, TreeHost {
     if (
       !this.clientInstance ||
       this.clientInstance.serverUrl !== c.serverUrl ||
-      this.clientInstance.project !== project ||
-      this.clientInstance.userName !== c.userName
+      this.clientInstance.project !== project
     ) {
       this.clientInstance = new MemoryClient({
-        serverUrl: c.serverUrl, project, timeout: c.timeout, userName: c.userName,
+        serverUrl: c.serverUrl, project, timeout: c.timeout,
       });
     }
     return this.clientInstance;
