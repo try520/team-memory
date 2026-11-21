@@ -16,12 +16,14 @@ import (
 )
 
 const (
-	Version         = "0.1.4"
+	Version         = "0.1.5"
 	DefaultProtocol = "2025-06-18"
 	SessionHeader   = "Mcp-Session-Id"
 	ProtocolHeader  = "MCP-Protocol-Version"
-	maxBodyBytes    = 4 << 20
-	maxImportBytes  = 64 << 20
+	// UserHeader 是客户端配置的自报开发者姓名，供 TASKS 推进者与 journal 文件名使用。
+	UserHeader     = "X-Memory-User"
+	maxBodyBytes   = 4 << 20
+	maxImportBytes = 64 << 20
 )
 
 var supportedProtocols = map[string]bool{
@@ -322,7 +324,9 @@ func (s *Server) handleMessage(req *rpcRequest, project string, r *http.Request)
 					"再由维护者 approve；全局技能会自动列在各项目 get_rules 的 global_skills 中，可用 skill_list 查看。" +
 					"协作：规划完成后、改代码前先把计划写进 TASKS.md（六列，含涉及文件）；改文件前先读 TASKS.md 看是否被其他会话登记，" +
 					"有就避开或沟通，做完立刻删行。服务端只在 warnings 里提示冲突，不阻断；这不是锁，兜底是按文件串行 + expectedHash。" +
-					"知道开发者姓名时，在 memory_write 里带上 userName（写进 TASKS 推进者与 journal 索引标签）；它是自报信息，不是身份认证，不能用于追责；不知道就不要编。",
+					"开发者姓名由客户端在 MCP 配置的 X-Memory-User 请求头里提供，通常不需要在工具参数里重复传；" +
+					"仅当本次要临时改用别的名字时，才在 memory_write 里传 userName（优先级：参数 > 请求头 > 会话标签）。" +
+					"它是自报信息，不是身份认证，不能用于追责；不知道就不要编。get_rules 会回显 user_name 与 user_name_source，按它确认即可。",
 			}),
 		}
 	}
@@ -355,7 +359,7 @@ func (s *Server) handleMessage(req *rpcRequest, project string, r *http.Request)
 	case "tools/list":
 		return msgOutcome{resp: okBody(req.ID, map[string]any{"tools": toolDefs()})}
 	case "tools/call":
-		result, rerr := s.callTool(req.Params, project)
+		result, rerr := s.callTool(req.Params, project, r.Header.Get(UserHeader))
 		if rerr != nil {
 			return msgOutcome{resp: errorBody(req.ID, rerr.Code, rerr.Message, rerr.Data)}
 		}
@@ -377,7 +381,7 @@ type callParams struct {
 	Arguments json.RawMessage `json:"arguments"`
 }
 
-func (s *Server) callTool(raw json.RawMessage, project string) (any, *rpcError) {
+func (s *Server) callTool(raw json.RawMessage, project, headerUser string) (any, *rpcError) {
 	var p callParams
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, &rpcError{Code: -32602, Message: "arguments 不是合法对象", Data: map[string]any{
@@ -394,7 +398,15 @@ func (s *Server) callTool(raw json.RawMessage, project string) (any, *rpcError) 
 
 	switch p.Name {
 	case "memory_get_rules":
-		resp, e := s.svc.GetRules(project)
+		var a struct {
+			UserName string `json:"userName"`
+		}
+		if len(p.Arguments) > 0 {
+			if err := json.Unmarshal(p.Arguments, &a); err != nil {
+				return nil, &rpcError{Code: -32602, Message: "arguments 解析失败", Data: map[string]any{"hint": "get_rules 不需要参数，可选 {userName}"}}
+			}
+		}
+		resp, e := s.svc.GetRulesAs(project, a.UserName, headerUser)
 		if e != nil {
 			return toolError(e), nil
 		}
@@ -447,7 +459,8 @@ func (s *Server) callTool(raw json.RawMessage, project string) (any, *rpcError) 
 		}
 		resp, e := s.svc.Write(project, kb.WriteReq{
 			Path: a.Path, Content: a.Content, Mode: a.Mode,
-			ExpectedHash: expected, Session: a.Session, UserName: a.UserName, Index: a.Index,
+			ExpectedHash: expected, Session: a.Session, UserName: a.UserName,
+			HeaderUser: headerUser, Index: a.Index,
 		})
 		if e != nil {
 			return toolError(e), nil

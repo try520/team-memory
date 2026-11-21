@@ -23,6 +23,8 @@ export interface RulesResp {
   project: string;
   rule_hash: string;
   session: string;
+  user_name?: string;
+  user_name_source?: 'param' | 'header' | 'session';
   service_rule: string;
   index: string;
   files: FileInfo[];

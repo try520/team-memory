@@ -28,7 +28,7 @@ curl -s http://127.0.0.1:8080/healthz   # {"ok":true,"projects":0,...}
 ```bash
 docker build --build-arg GO_IMAGE=registry.example.com/library/golang:1.23-alpine \
              --build-arg RUNTIME_IMAGE=registry.example.com/library/alpine:3.20 \
-             -t team-memory:0.1.4 .
+             -t team-memory:0.1.5 .
 ```
 
 一个数据目录只允许一个实例：启动会在数据目录写 `.pid`，检测到存活进程直接退出。
@@ -117,16 +117,17 @@ go run ./cmd/import -url http://127.0.0.1:8080 -project my-project \
 
 | 工具 | 用途 |
 |---|---|
-| `memory_get_rules` | 读服务级规则 + 项目索引（RULE.md 全文），返回 `session`、`warnings`、文件清单、当月/上月 journal 索引、`global_skills` 全局技能清单 |
+| `memory_get_rules` | 读服务级规则 + 项目索引（RULE.md 全文），返回 `session`、`user_name`/`user_name_source`（param/header/session）、`warnings`、文件清单、当月/上月 journal 索引、`global_skills` 全局技能清单；可选 `userName` 仅用于临时改名 |
 | `memory_read` | 读文件；`rev` 读 `.history` 旧版；超过 32KB 用 `next_offset` 续读；路径含 `skills/<name>/SKILL.md` 与只读的 `@global/skills/<name>/SKILL.md` |
-| `memory_write` | `create` / `append` / `replace`（必带 `expectedHash`）/ `reindex`（仅 RULE.md）；写技能文件时校验 frontmatter。可选 `userName`（自报开发者姓名，≤32 字，不能含竖线/换行）用于 TASKS.md 推进者与 journal 命名，缺省回落会话标签；TASKS.md 固定六列，写入时自动升级旧四/五列并在 `warnings` 提示同文件占用（`TASK_CONFLICT`，不阻断） |
+| `memory_write` | `create` / `append` / `replace`（必带 `expectedHash`）/ `reindex`（仅 RULE.md）；写技能文件时校验 frontmatter。姓名默认取客户端配置的 `X-Memory-User` 请求头（≤32 字，不能含竖线/换行），可选参数 `userName` 仅用于临时覆盖；优先级：参数 > 请求头 > 会话标签。名字用于 TASKS.md 推进者与 journal 命名；TASKS.md 固定六列，写入时自动升级旧四/五列并在 `warnings` 提示同文件占用（`TASK_CONFLICT`，不阻断） |
 | `memory_import` | 批量导入已有知识：模型先用自己的文件工具读源文档，再分批调它落盘，需 `session`，先 `dry_run` 预演 |
 | `skill_list` | 列出全局技能 + 当前项目技能（只读，无需 session），每项含 `scope/name/description/status/source_project/path` |
 | `skill_promote` | 技能提审：`submit`（生成全局 pending）→ `approve`（转 approved，各项目可见）/ `reject` / `cancel`，需 `session` |
 
 新建主题必须带 `index: {scene, examples}`，服务端按固定格式把行插进 `RULE.md` 索引表；
-写 `journal/YYYY-MM/` 下的 `.md` 时，服务端自动改名为 `journal/YYYY-MM/<姓名>-<hhmmss>.md`（`userName` 优先，
-缺省会话标签；同名同秒追加 `-2`、`-3` 去重），并向 `journal/YYYY-MM.INDEX.md` 追加一行，「会话标签」列写同一姓名值。
+写 `journal/YYYY-MM/` 下的 `.md` 时，服务端自动改名为 `journal/YYYY-MM/<姓名>-<hhmmss>.md`（姓名取 `X-Memory-User`，
+其次是工具参数 `userName`，都没有则会话标签；同名同秒追加 `-2`、`-3` 去重），并向 `journal/YYYY-MM.INDEX.md`
+追加一行，「会话标签」列写同一姓名值。
 
 TASKS.md 是开工前的计划 + 文件占用表，六列：`任务 | 状态 | 下一步 | 涉及文件 | 推进者（自报） | 更新时间`。
 规划完成后、改代码前先 `memory_write` 写计划（涉及文件用户号或顿号分隔）；改文件前先 `memory_read` 看是否被其他会话登记；

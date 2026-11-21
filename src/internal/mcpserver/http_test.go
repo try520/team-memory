@@ -100,7 +100,19 @@ func (c *testClient) rpc(method string, params any) (map[string]any, int) {
 // call 返回 (结构化结果, isError)。协议层错误直接 fail。
 func (c *testClient) call(name string, args any) (map[string]any, bool) {
 	c.t.Helper()
-	res, status := c.rpc("tools/call", map[string]any{"name": name, "arguments": args})
+	return c.callWith(nil, name, args)
+}
+
+// callWith 在 tools/call 上附带额外请求头（用于验证 X-Memory-User）。
+func (c *testClient) callWith(headers map[string]string, name string, args any) (map[string]any, bool) {
+	c.t.Helper()
+	req := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+		"params": map[string]any{"name": name, "arguments": args}}
+	body, _ := json.Marshal(req)
+	rec := c.do(body, headers, false)
+	var res map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &res)
+	status := rec.Code
 	if status != 200 {
 		c.t.Fatalf("%s HTTP status=%d body=%v", name, status, res)
 	}
@@ -623,4 +635,68 @@ func decodeBody(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 		t.Fatalf("decode: %v body=%s", err, rec.Body.String())
 	}
 	return out
+}
+
+func TestHTTPUserNameHeader(t *testing.T) {
+	c := newTestClient(t)
+	h := map[string]string{UserHeader: "王五"}
+
+	// 仅请求头：get_rules 回显 header 来源。
+	rules, isErr := c.callWith(h, "memory_get_rules", map[string]any{})
+	if isErr {
+		t.Fatalf("get_rules: %v", rules)
+	}
+	if rules["user_name"] != "王五" || rules["user_name_source"] != "header" {
+		t.Fatalf("回显不对: %v", rules)
+	}
+	session, _ := rules["session"].(string)
+
+	// 仅请求头：TASKS 推进者用头里的名字。
+	if _, isErr := c.callWith(h, "memory_write", map[string]any{
+		"path": "TASKS.md", "mode": "append", "session": session,
+		"content": "| 头部姓名演示 | 进行中 | 写文件 | topics/演示.md | | |\n",
+	}); isErr {
+		t.Fatal("带头的 TASKS 写入失败")
+	}
+	tasks, _ := c.callWith(h, "memory_read", map[string]any{"path": "TASKS.md"})
+	if !strings.Contains(tasks["content"].(string), "| 王五 |") {
+		t.Fatalf("TASKS 推进者没用头里的名字:\n%s", tasks["content"])
+	}
+
+	// 仅请求头：journal 文件名用头里的名字。
+	w, isErr := c.callWith(h, "memory_write", map[string]any{
+		"path": "journal/2026-11/演示.md", "mode": "create", "session": session,
+		"content": "# 演示\n结论。\n",
+	})
+	if isErr {
+		t.Fatalf("journal: %v", w)
+	}
+	p, _ := w["path"].(string)
+	if !strings.HasPrefix(p, "journal/2026-11/王五-") || !strings.HasSuffix(p, ".md") {
+		t.Fatalf("journal 文件名没用头里的名字: %s", p)
+	}
+
+	// 参数覆盖头：get_rules 来源为 param。
+	over, isErr := c.callWith(h, "memory_get_rules", map[string]any{"userName": "赵六"})
+	if isErr || over["user_name"] != "赵六" || over["user_name_source"] != "param" {
+		t.Fatalf("参数覆盖头失败: %v", over)
+	}
+
+	// 非法头：忽略并回落会话标签，不报错。
+	bad, isErr := c.callWith(map[string]string{UserHeader: "张|三"}, "memory_get_rules", map[string]any{})
+	if isErr {
+		t.Fatalf("非法头不应拒绝请求: %v", bad)
+	}
+	if bad["user_name"] != bad["session"] || bad["user_name_source"] != "session" {
+		t.Fatalf("非法头应回落到会话标签: %v", bad)
+	}
+
+	// 非法参数：显式报错。
+	_, isErr = c.callWith(h, "memory_write", map[string]any{
+		"path": "TASKS.md", "mode": "append", "session": session, "userName": "张|三",
+		"content": "| x | 待办 | y | | | |\n",
+	})
+	if !isErr {
+		t.Fatal("非法 userName 参数应返回错误")
+	}
 }

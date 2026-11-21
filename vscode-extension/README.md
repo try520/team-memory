@@ -2,7 +2,7 @@
 
 在编辑器里浏览、编辑团队研发记忆服务（team-memory）中的项目记忆：切换项目、看 RULE 索引、按主题/journal 浏览、直接改文件保存回服务、查看索引警告并执行 reindex。
 
-> 版本对应：插件 `0.1.1` 可连服务端 `0.1.1+`（当前服务端 `0.1.4`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
+> 版本对应：插件 `0.1.5` 可连服务端 `0.1.1+`（当前服务端 `0.1.5`）。两者独立发版，同一小版本号表示该组合已联调；插件可连更高版本服务端。
 
 ## 安装
 
@@ -11,25 +11,25 @@
 ### VS Code
 
 1. 打开扩展面板（`Ctrl+Shift+X`）→ 右上角 `...` → **Install from VSIX...**
-2. 选择 `team-memory-0.1.1.vsix`
+2. 选择 `team-memory-0.1.5.vsix`
 3. 装完重载窗口（`Ctrl+Shift+P` → `Developer: Reload Window`）
 
 命令行方式（`code` 在 PATH 里时）：
 
 ```powershell
-code --install-extension .\team-memory-0.1.1.vsix
+code --install-extension .\team-memory-0.1.5.vsix
 ```
 
 ### Trae
 
 1. 打开扩展面板 → 右上角 `...` → **Install from VSIX...**
-2. 选择同一个 `team-memory-0.1.1.vsix`
+2. 选择同一个 `team-memory-0.1.5.vsix`
 3. 重载窗口
 
 如果 Trae 的安装目录下有命令行工具（`Trae.exe` / `trae.cmd`），也可以：
 
 ```powershell
-& "C:\path\to\Trae.exe" --install-extension .\team-memory-0.1.1.vsix
+& "C:\path\to\Trae.exe" --install-extension .\team-memory-0.1.5.vsix
 ```
 
 装好后左侧活动栏会出现「团队记忆」图标。
@@ -42,7 +42,8 @@ code --install-extension .\team-memory-0.1.1.vsix
 {
   "teamMemory.serverUrl": "http://<your-server>:8080",
   "teamMemory.autoConnect": true,
-  "teamMemory.requestTimeoutMs": 15000
+  "teamMemory.requestTimeoutMs": 15000,
+  "teamMemory.userName": "张三"
 }
 ```
 
@@ -51,6 +52,7 @@ code --install-extension .\team-memory-0.1.1.vsix
 | `teamMemory.serverUrl` | 记忆服务地址，默认 `http://127.0.0.1:8080`，**不要带 `/mcp`** |
 | `teamMemory.autoConnect` | 启动时自动连接并读取索引 |
 | `teamMemory.requestTimeoutMs` | 单次请求超时（毫秒） |
+| `teamMemory.userName` | 你的名字（自报，不是身份认证），作为 `X-Memory-User` 头带给服务端，用于 TASKS 推进者与 journal 文件名；留空回落到会话标签。切换项目不会丢 |
 
 项目**不在设置里配**：在侧边栏标题栏的「切换项目」里选，选择结果按工作区记住（存在工作区状态里，不写 `settings.json`）。旧版本的 `teamMemory.project` 已废弃，留在 `settings.json` 里也不会生效，可以删掉。
 
@@ -96,7 +98,7 @@ code --install-extension .\team-memory-0.1.1.vsix
 
 ### 写 journal / 加任务
 
-- `团队记忆: 写 journal`：写入 `journal/<YYYY-MM>/` 下的日志，服务端会改名为 `<姓名或会话标签>-<hhmmss>.md`（插件用会话标签），并自动出现在当月索引里
+- `团队记忆: 写 journal`：写入 `journal/<YYYY-MM>/` 下的日志，服务端会改名为 `<姓名或会话标签>-<hhmmss>.md`（姓名取插件配置 `teamMemory.userName`，未配置则用会话标签），并自动出现在当月索引里
 - `团队记忆: 添加任务`：向 `TASKS.md` 追加一条 `- [ ] ...` 清单项。它是普通待办，不参与六列「涉及文件」占用登记；要登记涉及文件、让别人看到占用，请在对话里用 `memory_write` 写表格行
 
 ### 索引警告与 reindex
@@ -137,7 +139,7 @@ code --install-extension .\team-memory-0.1.1.vsix
 ```yaml
 services:
   memory:
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.4
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.5
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -171,7 +173,7 @@ docker compose up -d
 docker ps                       # STATUS 变成 healthy 即正常
 
 curl -s http://127.0.0.1:28080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.4"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.5"}
 
 curl -s http://127.0.0.1:28080/mcp
 # 返回 service、version、projects、tools 列表
@@ -206,94 +208,9 @@ tar czf memory-$(date +%F).tgz -C ./data .
 
 ## 配置 MCP 客户端
 
-服务端是 Streamable HTTP，每个项目一个 URL：`http://<服务器IP>:28080/mcp/<project>`，最后一段就是项目名。项目在第一次请求时自动创建，不需要预先登记。
+客户端（VS Code / Trae / Claude Code / Qoder / CodeBuddy）的完整配置统一维护在根 README 的 [MCP 接入](../README.md#mcp-接入) 一节，含文件路径、可复制 JSON、`X-Memory-User` 头与连接确认方法。这里不再重复，避免两处漂移。
 
-服务端**不校验任何请求头**，所以 `X-Memory-Client` 只是自定义标识、**不是必需**；下面示例里有的写了、有的没写，两种都能连。连上后工具列表应该有 6 个（`memory_get_rules`、`memory_read`、`memory_write`、`memory_import`、`skill_list`、`skill_promote`）。
-
-示例里的 `<your-server>` 换成你的服务器地址，端口按 compose 里 `ports` 的左边改。
-
-### VS Code：`.vscode/mcp.json`
-
-键是 `servers`，远程条目写 `type: "http"`：
-
-```json
-{
-  "servers": {
-    "team-memory-my-project": {
-      "type": "http",
-      "url": "http://<your-server>:28080/mcp/my-project",
-      "headers": {
-        "X-Memory-Client": "vscode"
-      }
-    },
-    "team-memory-my-other-project": {
-      "type": "http",
-      "url": "http://<your-server>:28080/mcp/my-other-project"
-    }
-  }
-}
-```
-
-放进工作区根目录的 `.vscode/mcp.json`（没有就新建），从 MCP 视图启动服务器。确认：服务器显示已连接、工具列表出现上面 6 个工具。
-
-### Trae：`User/mcp.json`
-
-Trae 的键是 `mcpServers`，远程条目只写 `url`（可选 `headers`），**不要写 `type`**——Trae 的 mcp.json schema 里远程条目只有 `url`、`headers`、`oauth`、`fromGalleryId`、`disabled`，多写字段会校验失败。
-
-文件位置：Windows `%APPDATA%\Trae CN\User\mcp.json`（国际版 `%APPDATA%\Trae\User\mcp.json`）。已有内容时只往 `mcpServers` 里加条目，不要覆盖其他服务器。
-
-```json
-{
-  "mcpServers": {
-    "team-memory-xxxx": {
-      "url": "http://<your-server>:28080/mcp/xxxx",
-      "headers": {
-        "X-Memory-Client": "trae"
-      }
-    },
-    "team-memory-yyyy": {
-      "url": "http://<your-server>:28080/mcp/yyyy"
-    }
-  }
-}
-```
-
-确认：Trae 的 MCP 设置页里该服务器显示已连接，工具列表出现上面 6 个工具。
-
-### Claude Code：项目根目录 `.mcp.json`
-
-键是 `mcpServers`，远程条目写 `type: "http"`：
-
-```json
-{
-  "mcpServers": {
-    "team-memory-xxxx": {
-      "type": "http",
-      "url": "http://<your-server>:28080/mcp/xxxx",
-      "headers": {
-        "X-Memory-Client": "claude-code"
-      }
-    },
-    "team-memory-yyyy": {
-      "type": "http",
-      "url": "http://<your-server>:28080/mcp/yyyy"
-    }
-  }
-}
-```
-
-这份内容就是下面命令实际生成的，也可以直接跑命令：
-
-```bash
-claude mcp add --scope project --transport http team-memory-my-project \
-  http://<your-server>:28080/mcp/my-project --header "X-Memory-Client: claude-code"
-```
-
-确认：在同一目录执行 `claude mcp list`，应输出 `team-memory-my-project: http://<your-server>:28080/mcp/my-project (HTTP) - ✓ Connected`。
-
-### 其他支持 Streamable HTTP 的客户端
-
-只需要一个 URL：`http://<服务器IP>:28080/mcp/<project>`；需要标识来源时再加请求头 `X-Memory-Client: <客户端名>`。没有 `type` 字段概念的客户端只填 URL 即可。
+插件本身只需要配置 `teamMemory.userName`（见上方设置表）：它会作为 `X-Memory-User` 头带给服务端，写 journal 和建主题时不用再手填名字；留空则回落到会话标签。
 
 ### 元数据端点 `/mcp`（只用来核对，不要配成 MCP 服务器）
 
@@ -303,7 +220,7 @@ claude mcp add --scope project --transport http team-memory-my-project \
 curl -s http://<your-server>:28080/mcp
 # {"endpoint":"/mcp/<project>","projects":["my-project","my-other-project"],"protocol":"2025-06-18",
 #  "service":"team-memory","tools":["memory_get_rules","memory_read","memory_write","memory_import","skill_list","skill_promote"],
-#  "version":"0.1.4",...}
+#  "version":"0.1.5",...}
 ```
 
 它不是 MCP 端点：`POST /mcp` 会返回 `400 {"error":"PROJECT_REQUIRED"}`。客户端一律指向 `/mcp/<project>`。

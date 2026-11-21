@@ -79,15 +79,18 @@ type Window struct {
 }
 
 type RulesResp struct {
-	Project       string     `json:"project"`
-	RuleHash      string     `json:"rule_hash"`
-	Session       string     `json:"session"`
-	ServiceRule   string     `json:"service_rule"`
-	Index         string     `json:"index"`
-	Files         []FileInfo `json:"files"`
-	JournalIndex  []string   `json:"journal_index"`
-	Warnings      []Warning  `json:"warnings"`
-	JournalWindow Window     `json:"journal_window"`
+	Project  string `json:"project"`
+	RuleHash string `json:"rule_hash"`
+	Session  string `json:"session"`
+	// UserName / UserNameSource 回显服务端最终识别的自报姓名与来源（param/header/session）。
+	UserName       string     `json:"user_name"`
+	UserNameSource string     `json:"user_name_source"`
+	ServiceRule    string     `json:"service_rule"`
+	Index          string     `json:"index"`
+	Files          []FileInfo `json:"files"`
+	JournalIndex   []string   `json:"journal_index"`
+	Warnings       []Warning  `json:"warnings"`
+	JournalWindow  Window     `json:"journal_window"`
 	// LastWrite / DaysSinceWrite / RecordReminder 用于提醒「该写回了」：
 	// 只看 topics/ 与 journal/ 的记录，模板文件不算。
 	LastWrite      string `json:"last_write,omitempty"`
@@ -114,13 +117,15 @@ type IndexRow struct {
 }
 
 type WriteReq struct {
-	Path         string    `json:"path"`
-	Content      string    `json:"content"`
-	Mode         string    `json:"mode"`
-	ExpectedHash string    `json:"expectedHash"`
-	Session      string    `json:"session"`
-	UserName     string    `json:"userName"`
-	Index        *IndexRow `json:"index"`
+	Path         string `json:"path"`
+	Content      string `json:"content"`
+	Mode         string `json:"mode"`
+	ExpectedHash string `json:"expectedHash"`
+	Session      string `json:"session"`
+	UserName     string `json:"userName"`
+	// HeaderUser 是 X-Memory-User 请求头里的姓名，只在服务端内部使用，不来自 JSON。
+	HeaderUser string    `json:"-"`
+	Index      *IndexRow `json:"index"`
 }
 
 type WriteResp struct {
@@ -203,6 +208,12 @@ func (s *Service) ruleHash(slug string) (string, *Error) {
 }
 
 func (s *Service) GetRules(slug string) (*RulesResp, *Error) {
+	return s.GetRulesAs(slug, "", "")
+}
+
+// GetRulesAs 接受工具参数与 X-Memory-User 请求头里的自报姓名，
+// 回显最终采用的名字与来源（param / header / session），让模型不必猜自己是谁。
+func (s *Service) GetRulesAs(slug, paramUser, headerUser string) (*RulesResp, *Error) {
 	if e := s.ensureProject(slug); e != nil {
 		return nil, e
 	}
@@ -273,15 +284,21 @@ func (s *Service) GetRules(slug string) (*RulesResp, *Error) {
 		return nil, ge
 	}
 
+	name, nameSource, ue := ResolveUserName(paramUser, headerUser, sid)
+	if ue != nil {
+		return nil, ue
+	}
 	return &RulesResp{
-		Project:      slug,
-		RuleHash:     hash,
-		Session:      sid,
-		ServiceRule:  svc,
-		Index:        string(rule),
-		Files:        files,
-		JournalIndex: s.journalIndexFiles(slug, now),
-		Warnings:     s.warnings(slug, string(rule)),
+		Project:        slug,
+		RuleHash:       hash,
+		Session:        sid,
+		UserName:       name,
+		UserNameSource: nameSource,
+		ServiceRule:    svc,
+		Index:          string(rule),
+		Files:          files,
+		JournalIndex:   s.journalIndexFiles(slug, now),
+		Warnings:       s.warnings(slug, string(rule)),
 		JournalWindow: Window{
 			From:  from.Format("2006-01-02"),
 			To:    now.Format("2006-01-02"),
@@ -445,8 +462,8 @@ func (s *Service) Write(slug string, req WriteReq) (*WriteResp, *Error) {
 	if e := s.lookupSession(req.Session, slug); e != nil {
 		return nil, e
 	}
-	// userName 是调用方自报的名字：仅用于展示与协作提示，不是身份认证。
-	name, e := normalizeUserName(req.UserName)
+	// 名字按「工具参数 > X-Memory-User 请求头 > 会话标签」取，仅用于展示与协作提示，不是身份认证。
+	name, _, e := ResolveUserName(req.UserName, req.HeaderUser, req.Session)
 	if e != nil {
 		return nil, e
 	}

@@ -2,7 +2,7 @@
   "name": "team-memory",
   "displayName": "团队记忆",
   "description": "浏览与编辑团队研发记忆服务（team-memory）中的项目记忆：项目切换、文件树、索引警告、编辑保存。",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "publisher": "try520",
   "license": "MIT",
   "repository": {
@@ -161,6 +161,11 @@
           "type": "number",
           "default": 15000,
           "description": "单次请求超时（毫秒）。"
+        },
+        "teamMemory.userName": {
+          "type": "string",
+          "default": "",
+          "description": "你的名字（自报，不是身份认证）。会作为 X-Memory-User 请求头发给服务端，用于 TASKS 推进者与 journal 文件名；留空则回落到会话标签。"
         }
       }
     }

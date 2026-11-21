@@ -112,7 +112,7 @@ data/
 cd src
 docker compose up -d
 curl -s http://127.0.0.1:8080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.4"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.5"}
 ```
 
 `docker-compose.yml` 默认从本目录构建镜像，并把 `./data` 挂到容器的 `/data`。镜像已公开发布、可匿名拉取，也可 `docker compose up -d --build` 本地构建。
@@ -122,7 +122,7 @@ curl -s http://127.0.0.1:8080/healthz
 ```yaml
 services:
   memory:
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.4
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.5
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -149,29 +149,134 @@ services:
 
 每个项目一个 URL：`http://<your-server>:8080/mcp/<project>`。项目在第一次请求时自动创建，零注册。
 
-**Claude Code**（项目根 `.mcp.json`）：
+所有客户端都建议加请求头 `X-Memory-User`，值换成你自己的名字（例如 `张三`）：服务端用它作为 TASKS.md 的「推进者」和 journal 文件名，`get_rules` 会回显 `user_name` 与来源。它是自报信息，不是身份认证，不能用于追责；值非法（超 32 字、含竖线/换行）会被忽略并回落到 `s_xxxxxxxx` 会话标签，不阻断连接。
+
+### VS Code / Copilot：`.vscode/mcp.json`
+
+文件位置：工作区根目录 `.vscode/mcp.json`（没有就新建）。顶层键是 `servers`，远程条目写 `type: "http"`。
 
 ```json
-{"mcpServers":{"team-memory-<project>":{"type":"http","url":"http://<your-server>:8080/mcp/<project>"}}}
+{
+  "servers": {
+    "team-memory-<project>": {
+      "type": "http",
+      "url": "http://<your-server>:8080/mcp/<project>",
+      "headers": {
+        "X-Memory-User": "张三"
+      }
+    }
+  }
+}
 ```
 
-**Cursor**（`.cursor/mcp.json`）：
+确认：在 MCP 视图启动该服务器，状态显示已连接，工具列表出现 6 个工具（`memory_get_rules`、`memory_read`、`memory_write`、`memory_import`、`skill_list`、`skill_promote`）；或在 Copilot Chat 的工具体选择器里看到这些工具。
+
+### Trae：`%APPDATA%\Trae CN\User\mcp.json`
+
+文件位置：Windows 国内版 `%APPDATA%\Trae CN\User\mcp.json`，国际版 `%APPDATA%\Trae\User\mcp.json`（本机两个文件均存在）。顶层键是 `mcpServers`。
+
+字段限制：远程条目**只写 `url`、`headers`，不要写 `type`**。本机 Trae CN 的 schema（注册名 `vscode://schemas/mcp-settings/user`，HTTP 分支 `required: ["url"]`、`additionalProperties: false`）没有 `type` 字段，多写会校验失败。
 
 ```json
-{"mcpServers":{"team-memory-<project>":{"url":"http://<your-server>:8080/mcp/<project>"}}}
+{
+  "mcpServers": {
+    "team-memory-<project>": {
+      "url": "http://<your-server>:8080/mcp/<project>",
+      "headers": {
+        "X-Memory-User": "张三"
+      }
+    }
+  }
+}
 ```
 
-**VS Code / Copilot**（`.vscode/mcp.json`，顶层键是 `servers`）：
+确认：设置 > MCP，该服务器显示已连接，工具列表出现上面 6 个工具。
+
+### Claude Code：项目根 `.mcp.json`
+
+文件位置：项目根目录 `.mcp.json`。顶层键是 `mcpServers`，远程条目写 `type: "http"`。
 
 ```json
-{"servers":{"team-memory-<project>":{"type":"http","url":"http://<your-server>:8080/mcp/<project>"}}}
+{
+  "mcpServers": {
+    "team-memory-<project>": {
+      "type": "http",
+      "url": "http://<your-server>:8080/mcp/<project>",
+      "headers": {
+        "X-Memory-User": "张三"
+      }
+    }
+  }
+}
 ```
 
-只支持 stdio 的客户端：`npx -y mcp-remote http://<your-server>:8080/mcp/<project>` 做代理。
+等价的命令行写法（`--header` 可以重复，值按需换成你的名字）：
+
+```bash
+claude mcp add --scope project --transport http team-memory-<project> \
+  http://<your-server>:8080/mcp/<project> --header "X-Memory-User: 张三"
+```
+
+确认：在同一目录执行 `claude mcp list`，应看到该服务器 `✓ Connected`；会话里 `/mcp` 可查看工具列表。
+
+### Qoder：项目根 `.mcp.json`
+
+文件位置：项目级 `<项目>/.mcp.json`（顶层 `mcpServers`）；用户级 `%USERPROFILE%\.qoder\settings.json` 的 `mcpServers`。依据 Qoder 官方 MCP 参考，并已用本机 `qodercli mcp add` 实际生成/解析验证。
+
+字段限制：远程条目写 `type: "http"`（或 `streamable-http`）、`url`、`headers`。
+
+```json
+{
+  "mcpServers": {
+    "team-memory-<project>": {
+      "type": "http",
+      "url": "http://<your-server>:8080/mcp/<project>",
+      "headers": {
+        "X-Memory-User": "张三"
+      }
+    }
+  }
+}
+```
+
+等价的命令行写法（本机实测生成的就是上面这份 `.mcp.json`）：
+
+```bash
+qodercli mcp add -s project -t http team-memory-<project> \
+  http://<your-server>:8080/mcp/<project> -H "X-Memory-User: 张三"
+```
+
+确认：`qodercli mcp get team-memory-<project>` 能看到 `Type: http`、URL 与 `X-Memory-User` 头；会话内 `/mcp` 查看连接状态与工具列表。本机未启动交互会话，6 个工具的实际注入未实测。
+
+### CodeBuddy：`%USERPROFILE%\.codebuddy\.mcp.json`
+
+文件位置：官方文档为 `%USERPROFILE%\.codebuddy\.mcp.json`（Windows）或 `~/.codebuddy/.mcp.json`。本机已有旧版 `%USERPROFILE%\.codebuddy\mcp.json`；官方文档说明，若旧版文件存在则优先写入已存在的那个。顶层键是 `mcpServers`。
+
+字段限制：HTTP 条目写 `type: "http"`、`url`、`headers`（官方 HTTP 类型字段表）。
+
+```json
+{
+  "mcpServers": {
+    "team-memory-<project>": {
+      "type": "http",
+      "url": "http://<your-server>:8080/mcp/<project>",
+      "headers": {
+        "X-Memory-User": "张三"
+      }
+    }
+  }
+}
+```
+
+确认：在 CodeBuddy 的 MCP 设置/面板里查看该服务器已连接、工具列表出现上面 6 个工具。本机只装了 CodeBuddy 扩展，没有可启动的 CLI/IDE，因此未做工具列表实测。
+
+### 其他客户端
+
+远程条目统一需要：URL `http://<your-server>:8080/mcp/<project>` + 请求头 `X-Memory-User: <你的名字>`；若客户端要求显式传输类型，写 `http`。只支持 stdio 的客户端可用 `npx -y mcp-remote http://<your-server>:8080/mcp/<project>` 做代理（代理方式无法方便地附加自定义头，名字会回落到会话标签）。
 
 服务端提供 6 个工具：`memory_get_rules`、`memory_read`、`memory_write`、`memory_import`、`skill_list`、`skill_promote`。详见 [src/README.md](src/README.md)。
 
-`memory_write` 的可选参数 `userName` 是调用方自报的开发者姓名（≤32 字，不能含竖线/换行），用于 TASKS.md 的「推进者」与 journal 文件名/索引标签；缺省回落到 `s_xxxxxxxx` 会话标签。它不是身份认证，不能用于追责。
+开发者姓名来自客户端配置的 `X-Memory-User` 请求头（推荐，一次配置长期生效）；`memory_write` 的可选参数 `userName` 只用于临时改用别的名字。优先级：**工具参数 > 请求头 > 会话标签**。名字用于 TASKS.md 的「推进者」与 journal 文件名/索引标签；工具参数非法返回 400，请求头非法则忽略并回落，不会让整个客户端不可用。它不是身份认证，不能用于追责。
 
 TASKS.md 是**开工前的计划 + 文件占用表**：规划完成后、改代码前先写计划（含涉及文件），改文件前先读它看是否被其他会话登记，任务完成立刻删行。写入时若发现同一路径被别的会话登记，响应 `warnings` 会给出 `TASK_CONFLICT` 提示，但不阻断——这是自报的协作约定，不是锁，真正的兜底是服务端按文件串行 + `expectedHash` 校验。
 
@@ -179,7 +284,7 @@ TASKS.md 是**开工前的计划 + 文件占用表**：规划完成后、改代�
 
 ## 编辑器扩展
 
-扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.1`、服务端 `0.1.4`（插件可连 `0.1.1+`）：
+扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.5`、服务端 `0.1.5`（插件可连 `0.1.1+`）：
 
 ```powershell
 code --install-extension .\team-memory-<version>.vsix

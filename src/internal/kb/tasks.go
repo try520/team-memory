@@ -126,9 +126,16 @@ func normalizeTaskRow(line, session, author, stamp string) string {
 	return "| " + strings.Join(cells, " | ") + " |"
 }
 
-// normalizeUserName 清洗 userName 参数：空值视为未提供；超过 32 字符或含表格/换行会被拒绝，
+// 姓名来源，用于 get_rules 回显。
+const (
+	UserSourceParam   = "param"
+	UserSourceHeader  = "header"
+	UserSourceSession = "session"
+)
+
+// NormalizeUserName 清洗 userName：空值视为未提供；超过 32 字符或含表格/换行会被拒绝，
 // 避免写坏 markdown 表格。名字只用于展示与协作提示，不做身份认证。
-func normalizeUserName(raw string) (string, *Error) {
+func NormalizeUserName(raw string) (string, *Error) {
 	name := strings.TrimSpace(raw)
 	if name == "" {
 		return "", nil
@@ -142,6 +149,27 @@ func normalizeUserName(raw string) (string, *Error) {
 		}
 	}
 	return name, nil
+}
+
+// ResolveUserName 按「工具参数 > 请求头 > 会话标签」取开发者姓名，并返回来源。
+// 工具参数非法时返回 400，让调用方显式知道写错了；请求头非法时直接忽略并继续回落，
+// 避免一个人把 X-Memory-User 配错导致整个客户端不可用。
+func ResolveUserName(param, header, session string) (string, string, *Error) {
+	if strings.TrimSpace(param) != "" {
+		name, e := NormalizeUserName(param)
+		if e != nil {
+			return "", "", e
+		}
+		if name != "" {
+			return name, UserSourceParam, nil
+		}
+	}
+	if strings.TrimSpace(header) != "" {
+		if name, e := NormalizeUserName(header); e == nil && name != "" {
+			return name, UserSourceHeader, nil
+		}
+	}
+	return session, UserSourceSession, nil
 }
 
 // tasksConflicts 返回 TASKS.md 里「其他会话」登记了同一路径的任务行。

@@ -10,10 +10,15 @@ func toolDefs() []any {
 			"description": "在任何读取或写入之前先调用。返回服务级规则、项目 RULE.md 索引全文、文件清单、索引体检 warnings、" +
 				"当月/上月 journal 索引、距上次记录的天数（last_write / days_since_write / record_reminder），以及写入所需的 session。" +
 				"用返回索引里的「适用场景/举例」决定先读哪些最相关的主题文档，覆盖本次要碰的代码和数据即停，不够再继续；不必一次读完整 topics/ 目录。" +
-				"返回结构：{project, rule_hash, session, service_rule, index, files[], journal_index[], warnings[], journal_window, last_write, days_since_write, record_reminder}。",
+				"服务端会回显 user_name 与 user_name_source（param / header / session）：姓名通常来自客户端配置的 X-Memory-User 请求头，" +
+				"通常无需在工具参数里重复传；仅临时改用别的名字时才传 userName。" +
+				"返回结构：{project, rule_hash, session, user_name, user_name_source, service_rule, index, files[], journal_index[], warnings[], journal_window, last_write, days_since_write, record_reminder}。",
 			"inputSchema": map[string]any{
-				"type":                 "object",
-				"properties":           map[string]any{},
+				"type": "object",
+				"properties": map[string]any{
+					"userName": map[string]any{"type": "string",
+						"description": "可选。仅临时改用别的名字时传；正常由客户端 X-Memory-User 头统一提供，不要每次重复传"},
+				},
 				"additionalProperties": false,
 			},
 			"annotations": map[string]any{"readOnlyHint": true, "openWorldHint": false},
@@ -52,8 +57,9 @@ func toolDefs() []any {
 				"TASKS.md 是开工前计划 + 文件占用表（六列：任务/状态/下一步/涉及文件/推进者/更新时间）：规划完成后先写计划再改代码，" +
 				"改文件前先读 TASKS.md 看有没有别的会话登记同一文件，做完立刻删行；服务端只在 warnings 提示冲突、不阻断，" +
 				"这是自报约定而非锁，兜底是按文件串行 + expectedHash。" +
-				"userName 可选：调用方自报的开发者姓名，用于 TASKS.md 的「推进者」与 journal 索引的「会话标签」；" +
-				"它不是身份认证，不能用于追责；知道姓名就带，不知道不要编，缺省回落到会话标签。" +
+				"userName 可选：调用方自报的开发者姓名，用于 TASKS.md 的「推进者」与 journal 文件名/索引「会话标签」。" +
+				"正常由客户端配置的 X-Memory-User 请求头统一提供，通常不需要每次传；仅本次要临时改用别的名字时才传。" +
+				"优先级：参数 > 请求头 > 会话标签。它不是身份认证，不能用于追责；不知道不要编。参数非法返回 400，请求头非法会被忽略并回落。" +
 				"next 是下一步该做什么的提示（例如「索引行已插入，收尾再写 journal」），按它继续，不要写完就走。",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -68,7 +74,7 @@ func toolDefs() []any {
 					"session": map[string]any{"type": "string",
 						"description": "memory_get_rules 返回的 session；规则变更后旧 session 失效，需重新获取"},
 					"userName": map[string]any{"type": "string",
-						"description": "可选。调用方自报的开发者姓名（≤32 字，不能含竖线/换行）；用作 TASKS.md 推进者与 journal 索引的会话标签。不是身份认证，不用于追责；不知道就不要填"},
+						"description": "可选。仅临时改用别的名字时传；正常由客户端 X-Memory-User 头统一提供。≤32 字，不能含竖线/换行；优先级：参数 > 请求头 > 会话标签。不是身份认证，不用于追责"},
 					"index": map[string]any{
 						"type":        "object",
 						"description": "新建主题时必填：索引行的「适用场景」与「举例」",
@@ -175,8 +181,8 @@ func toolDefs() []any {
 				"properties": map[string]any{
 					"action": map[string]any{"type": "string", "enum": []string{"submit", "approve", "reject", "cancel"},
 						"description": "submit 提审 / approve 通过 / reject 拒绝 / cancel 撤销"},
-					"name": map[string]any{"type": "string", "description": "技能名（小写字母、数字、中划线），如 code-review"},
-					"reason": map[string]any{"type": "string", "description": "submit 时说明为什么提审为全局技能，可选"},
+					"name":    map[string]any{"type": "string", "description": "技能名（小写字母、数字、中划线），如 code-review"},
+					"reason":  map[string]any{"type": "string", "description": "submit 时说明为什么提审为全局技能，可选"},
 					"session": map[string]any{"type": "string", "description": "memory_get_rules 返回的 session"},
 				},
 				"required":             []string{"action", "name", "session"},
