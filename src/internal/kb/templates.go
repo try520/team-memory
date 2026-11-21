@@ -33,9 +33,10 @@ const serviceRules = `# 团队研发记忆服务 · 服务级规则
    description 写清「什么时候该用这个技能」）。三种自然语言请求的固定处理方式：
    - 「根据之前的操作生成 xx 技能」：用 memory_write(mode=create) 写 skills/<name>/SKILL.md，按下面的技能骨架写。
    - 「修改 / 完善 xx 技能」：先 memory_read 读全文，再 memory_write 的 append（追加）或 replace（带 hash 覆盖）。
-   - 「把 xx 技能提升为全局技能」：先 skill_list 确认项目里有该技能，再 skill_promote(action=submit) 提审（可带 reason）；
-     维护者用 skill_promote(action=approve) 通过后，它才出现在各项目 get_rules 的 global_skills 清单里，
-     其他项目用 memory_read(path=@global/skills/<name>/SKILL.md) 读取全文。
+   - 「把 xx 技能提升为全局技能」：先 skill_list 确认项目里有该技能，再 skill_promote(action=promote) 一步提升
+     （写到 projects 平级的 skills/<name>/SKILL.md，status=approved，并移除项目内副本——移动，不是复制）；
+     需要别人审批时用两阶段 skill_promote(action=submit) → action=approve（通过时同样移除来源项目副本）。
+     之后它出现在各项目 get_rules 的 global_skills 清单里，用 memory_read(path=@global/skills/<name>/SKILL.md) 读全文。
    - 「拒绝 / 撤销 xx 的提审」：skill_promote(action=reject / cancel)。
    全局技能只读：不能 memory_write 到 @global/ 路径；改全局技能要先在项目里改技能再重新提审。
    skill_list 列出全局 + 项目技能，拿不准有没有某技能时先查它。

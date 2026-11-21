@@ -25,12 +25,12 @@ const (
 
 // SkillInfo 是技能清单里的一项。Path 可直接传给 memory_read 读取全文。
 type SkillInfo struct {
-	Scope         string `json:"scope"`                   // global | project
+	Scope         string `json:"scope"` // global | project
 	Name          string `json:"name"`
 	Description   string `json:"description"`
-	Status        string `json:"status"`                  // global: pending/approved；project: local
+	Status        string `json:"status"`                   // global: pending/approved；project: local
 	SourceProject string `json:"source_project,omitempty"` // 全局技能来自哪个项目
-	Path          string `json:"path"`                    // memory_read 可用的路径
+	Path          string `json:"path"`                     // memory_read 可用的路径
 }
 
 // SkillListResp 是 skill_list 的返回：全局技能 + 当前项目技能。
@@ -42,7 +42,7 @@ type SkillListResp struct {
 
 // SkillPromoteReq 是 skill_promote 的入参。
 type SkillPromoteReq struct {
-	Action  string `json:"action"`  // submit | approve | reject | cancel
+	Action  string `json:"action"`  // promote | submit | approve | reject | cancel
 	Name    string `json:"name"`    // 技能名
 	Reason  string `json:"reason"`  // submit 时说明为什么提审
 	Session string `json:"session"` // memory_get_rules 返回的 session
@@ -223,17 +223,18 @@ func (s *Service) SkillList(slug string) (*SkillListResp, *Error) {
 	return &SkillListResp{
 		Global:  global,
 		Project: local,
-		Hint:    "读技能全文用 memory_read(path=返回的 path)；写/改项目技能用 memory_write(path=skills/<name>/SKILL.md)。把项目技能提审为全局技能用 skill_promote(action=submit)。",
+		Hint:    "读技能全文用 memory_read(path=返回的 path)；写/改项目技能用 memory_write(path=skills/<name>/SKILL.md)。把项目技能一步提升为全局技能用 skill_promote(action=promote)，需要审批则用 submit→approve。",
 	}, nil
 }
 
-// SkillPromote 管理项目技能到全局技能的提审流程（submit→approve/reject，或 cancel）。
+// SkillPromote 把项目技能提升为全局技能：promote 一步到位（移动），
+// 或 submit→approve 两阶段审批（approve 时同样移动）；reject/cancel 删除 pending。
 // 无鉴权：任何持有 session 的调用方都可以 approve/reject（团队内部信任模型）。
 func (s *Service) SkillPromote(slug string, req SkillPromoteReq) (*SkillPromoteResp, *Error) {
 	switch req.Action {
-	case "submit", "approve", "reject", "cancel":
+	case "promote", "submit", "approve", "reject", "cancel":
 	default:
-		return nil, errf("BAD_REQUEST", 400, "action 非法", "action 只能是 submit / approve / reject / cancel")
+		return nil, errf("BAD_REQUEST", 400, "action 非法", "action 只能是 promote / submit / approve / reject / cancel")
 	}
 	name := strings.TrimSpace(req.Name)
 	if !store.ValidSkillName(name) {
@@ -299,6 +300,46 @@ func (s *Service) SkillPromote(slug string, req SkillPromoteReq) (*SkillPromoteR
 			Next: "由维护者调用 skill_promote(action=approve) 通过后，该技能才会出现在各项目的 get_rules 全局技能清单里。",
 		}, nil
 
+	case "promote":
+		// 一步到位：项目技能 → 全局 approved，并把项目内副本移除（移动，不是复制）。
+		projectRel := "skills/" + name + "/SKILL.md"
+		raw, _, rerr := s.st.ReadFile(slug, projectRel)
+		if rerr != nil {
+			if errors.Is(rerr, os.ErrNotExist) {
+				return nil, errf("NOT_FOUND", 404, "项目技能不存在", "先用 memory_write 写 skills/"+name+"/SKILL.md（含 name 与 description 的 frontmatter）。")
+			}
+			return nil, errf("INTERNAL", 500, "读取项目技能失败", rerr.Error())
+		}
+		doc, ve := validateSkillDoc(raw)
+		if ve != nil {
+			return nil, ve
+		}
+		if exists && status != "" {
+			return nil, &Error{
+				Code:    "ALREADY_PROMOTED",
+				Status:  409,
+				Message: "该技能已提审或已成为全局技能",
+				Hint:    "当前状态 " + status + "；全局技能只读，改内容请先在项目里改一份再处理。",
+			}
+		}
+		now := s.now().Format(time.RFC3339)
+		doc.fm["source_project"] = slug
+		doc.fm["status"] = skillStatusApproved
+		doc.fm["submitted_at"] = now
+		doc.fm["reviewed_at"] = now
+		doc.fm["reason"] = strings.TrimSpace(req.Reason)
+		if err := s.st.WriteAtomic(slug, globalRel, renderSkillDoc(doc)); err != nil {
+			return nil, errf("INTERNAL", 500, "写入全局技能失败", err.Error())
+		}
+		if err := s.st.RemoveProjectSkill(slug, name); err != nil {
+			return nil, errf("INTERNAL", 500, "移除项目技能失败", err.Error())
+		}
+		return &SkillPromoteResp{
+			OK: true, Action: req.Action, Name: name, Status: skillStatusApproved, Path: globalRel,
+			Hint: "已提升为全局技能，项目内副本已移除（移动，不是复制）。",
+			Next: "该技能已出现在所有项目的 get_rules.global_skills 里；用 memory_read(path=@global/skills/" + name + "/SKILL.md) 读全文。",
+		}, nil
+
 	case "approve":
 		if !exists {
 			return nil, errf("NOT_FOUND", 404, "全局技能不存在", "先由项目方调用 skill_promote(action=submit) 提交。")
@@ -311,9 +352,15 @@ func (s *Service) SkillPromote(slug string, req SkillPromoteReq) (*SkillPromoteR
 		if err := s.st.WriteAtomic(slug, globalRel, renderSkillDoc(globalDoc)); err != nil {
 			return nil, errf("INTERNAL", 500, "审批全局技能失败", err.Error())
 		}
+		// 通过后把来源项目里的副本移除（移动语义，避免两份内容漂移）。
+		if src := strings.TrimSpace(globalDoc.fm["source_project"]); src != "" {
+			if err := s.st.RemoveProjectSkill(src, name); err != nil {
+				return nil, errf("INTERNAL", 500, "移除项目技能失败", err.Error())
+			}
+		}
 		return &SkillPromoteResp{
 			OK: true, Action: req.Action, Name: name, Status: skillStatusApproved, Path: globalRel,
-			Hint: "已批准，该技能会在所有项目的 memory_get_rules 全局技能清单中列出。",
+			Hint: "已批准，该技能会在所有项目的 memory_get_rules 全局技能清单中列出；来源项目里的副本已移除。",
 		}, nil
 
 	default: // reject / cancel：删除 pending 全局技能

@@ -28,7 +28,7 @@ curl -s http://127.0.0.1:8080/healthz   # {"ok":true,"projects":0,...}
 ```bash
 docker build --build-arg GO_IMAGE=registry.example.com/library/golang:1.23-alpine \
              --build-arg RUNTIME_IMAGE=registry.example.com/library/alpine:3.20 \
-             -t team-memory:0.1.6 .
+             -t team-memory:0.1.7 .
 ```
 
 一个数据目录只允许一个实例：启动会在数据目录写 `.pid`，检测到存活进程直接退出。
@@ -105,7 +105,7 @@ Trae（`.trae/mcp.json`）、Claude Code（`.mcp.json`）、Qoder（`.mcp.json`�
 | `memory_write` | `create` / `append` / `replace`（必带 `expectedHash`）/ `reindex`（仅 RULE.md）；写技能文件时校验 frontmatter。姓名默认取客户端配置的 `X-Memory-User` 请求头（≤32 字，不能含竖线/换行），可选参数 `userName` 仅用于临时覆盖；优先级：参数 > 请求头 > 会话标签。名字用于 TASKS.md 推进者与 journal 命名；TASKS.md 固定六列，写入时自动升级旧四/五列并在 `warnings` 提示同文件占用（`TASK_CONFLICT`，不阻断） |
 | `memory_import` | 批量导入已有知识：模型先用自己的文件工具读源文档，再分批调它落盘，需 `session`，先 `dry_run` 预演 |
 | `skill_list` | 列出全局技能 + 当前项目技能（只读，无需 session），每项含 `scope/name/description/status/source_project/path` |
-| `skill_promote` | 技能提审：`submit`（生成全局 pending）→ `approve`（转 approved，各项目可见）/ `reject` / `cancel`，需 `session` |
+| `skill_promote` | 项目技能提升为全局技能：`promote` 一步到位（写到与 `projects/` 平级的 `skills/<name>/SKILL.md`，并删除项目内副本）；需审批时用 `submit`（生成全局 pending）→ `approve`（转 approved，同样移除来源项目副本）/ `reject` / `cancel`，需 `session` |
 
 新建主题必须带 `index: {scene, examples}`，服务端按固定格式把行插进 `RULE.md` 索引表；
 写 `journal/YYYY-MM/` 下的 `.md` 时，服务端自动改名为 `journal/YYYY-MM/<姓名>-<标题>-<hhmmss>.md`（姓名取 `X-Memory-User`，

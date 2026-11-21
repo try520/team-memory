@@ -170,18 +170,18 @@ func toolDefs() []any {
 		map[string]any{
 			"name":  "skill_promote",
 			"title": "提审 / 审批全局技能",
-			"description": "把项目技能提升为全局技能，两阶段：submit（生成全局 pending 副本）→ approve（转 approved，其他项目才可见）；" +
-				"reject/cancel 删除 pending。自然语言触发：「把 xx 技能提升为全局技能 / 提审 xx」→ action=submit；" +
-				"「通过 xx 技能审批」→ approve；「拒绝 / 撤销 xx 的提审」→ reject / cancel。" +
-				"submit 前先用 memory_write 写好 skills/<name>/SKILL.md（frontmatter 含 name 与 description），" +
-				"服务端会把来源项目、status=pending、理由写进全局副本；submit 可带 reason 说明提审理由。" +
-				"approve 后该技能出现在所有项目的 memory_get_rules 全局技能清单里。必须带 memory_get_rules 返回的 session；" +
-				"无鉴权，任意调用方都可 approve/reject。返回结构：{ok, action, name, status, path?, hint?, next?}。",
+			"description": "把项目技能提升为全局技能。promote 一步到位：把技能写到 projects 平级的 skills/<name>/SKILL.md（status=approved），" +
+				"并删除项目内副本（移动，不是复制）；需要别人审批时用两阶段 submit（生成 pending）→ approve（转 approved，同样移除来源项目副本）；" +
+				"reject/cancel 删除 pending。自然语言触发：「把 xx 技能提升为全局技能」→ action=promote；" +
+				"「提审 xx」→ submit；「通过 xx 技能审批」→ approve；「拒绝 / 撤销 xx 的提审」→ reject / cancel。" +
+				"提升前先用 memory_write 写好 skills/<name>/SKILL.md（frontmatter 含 name 与 description）。" +
+				"提升后该技能出现在所有项目的 memory_get_rules 全局技能清单里，项目里不再有副本，读全文用 memory_read(path=@global/skills/<name>/SKILL.md)。" +
+				"必须带 memory_get_rules 返回的 session；无鉴权，任意调用方都可 approve/reject。返回结构：{ok, action, name, status, path?, hint?, next?}。",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"action": map[string]any{"type": "string", "enum": []string{"submit", "approve", "reject", "cancel"},
-						"description": "submit 提审 / approve 通过 / reject 拒绝 / cancel 撤销"},
+					"action": map[string]any{"type": "string", "enum": []string{"promote", "submit", "approve", "reject", "cancel"},
+						"description": "promote 一步提升 / submit 提审 / approve 通过 / reject 拒绝 / cancel 撤销"},
 					"name":    map[string]any{"type": "string", "description": "技能名（小写字母、数字、中划线），如 code-review"},
 					"reason":  map[string]any{"type": "string", "description": "submit 时说明为什么提审为全局技能，可选"},
 					"session": map[string]any{"type": "string", "description": "memory_get_rules 返回的 session"},

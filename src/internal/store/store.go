@@ -432,6 +432,18 @@ func (s *Store) RemoveGlobalSkill(name string) error {
 	return os.RemoveAll(filepath.Join(s.GlobalSkillsDir(), name))
 }
 
+// RemoveProjectSkill 删除项目技能目录：提升为全局后「移动」而不是「复制」。
+func (s *Store) RemoveProjectSkill(slug, name string) error {
+	if !ValidSkillName(name) {
+		return ErrBadPath
+	}
+	dir, err := s.ProjectDir(slug)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(filepath.Join(dir, "skills", name))
+}
+
 func (s *Store) EnsureProjectLayout(slug string) error {
 	dir, err := s.ProjectDir(slug)
 	if err != nil {

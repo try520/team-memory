@@ -19,11 +19,11 @@ description: 涉及代码评审、CR 规范、提交前自查时必读
 
 func TestParseSkillDoc(t *testing.T) {
 	cases := []struct {
-		name      string
-		raw       string
-		wantErr   bool
-		wantName  string
-		wantBody  string
+		name     string
+		raw      string
+		wantErr  bool
+		wantName string
+		wantBody string
 	}{
 		{"正常", sampleSkill, false, "code-review", "# 代码评审"},
 		{"CRLF 与引号", "---\r\nname: \"my-skill\"\r\ndescription: '什么时候用'\r\n---\r\n正文", false, "my-skill", "正文"},
@@ -167,10 +167,58 @@ func TestSkillPromoteLifecycle(t *testing.T) {
 	if !strings.Contains(read.Content, "status: approved") {
 		t.Fatalf("审批后状态未更新: %s", read.Content)
 	}
+	// approve 也是移动语义：来源项目里的副本应被移除。
+	if svc.st.Exists("proj-a", "skills/code-review/SKILL.md") {
+		t.Fatal("approve 后来源项目的技能副本应被移除")
+	}
 
 	// 8. 已 approve 再 approve → 409。
 	if _, e := svc.SkillPromote("proj-a", SkillPromoteReq{Action: "approve", Name: "code-review", Session: sess}); e == nil || e.Code != "INVALID_STATE" {
 		t.Fatalf("重复审批期望 INVALID_STATE，得到 %+v", e)
+	}
+}
+
+func TestSkillPromoteMovesToGlobal(t *testing.T) {
+	svc := newSvc(t)
+	rules := mustRules(t, svc, "proj-a")
+
+	if _, e := svc.Write("proj-a", WriteReq{
+		Path: "skills/demo-skill/SKILL.md", Mode: "create", Session: rules.Session,
+		Content: "---\nname: demo-skill\ndescription: 演示技能\n---\n\n# demo\n",
+	}); e != nil {
+		t.Fatalf("create skill: %+v", e)
+	}
+
+	res, e := svc.SkillPromote("proj-a", SkillPromoteReq{
+		Action: "promote", Name: "demo-skill", Session: rules.Session, Reason: "跨项目通用",
+	})
+	if e != nil || res.Status != skillStatusApproved {
+		t.Fatalf("promote: %+v %+v", res, e)
+	}
+	if svc.st.Exists("proj-a", "skills/demo-skill/SKILL.md") {
+		t.Fatal("promote 后项目副本应被移除（移动语义）")
+	}
+	if !svc.st.Exists("@global", "@global/skills/demo-skill/SKILL.md") {
+		t.Fatal("promote 后全局技能应存在")
+	}
+	raw, _, err := svc.st.ReadFile("@global", "@global/skills/demo-skill/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"status: approved", "source_project: proj-a"} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("全局技能缺 %q:\n%s", want, raw)
+		}
+	}
+
+	list, _ := svc.SkillList("proj-a")
+	if len(list.Project) != 0 || len(list.Global) != 1 || list.Global[0].Status != skillStatusApproved {
+		t.Fatalf("清单不对: project=%+v global=%+v", list.Project, list.Global)
+	}
+
+	// 已提升后再 promote → 409。
+	if _, e := svc.SkillPromote("proj-a", SkillPromoteReq{Action: "promote", Name: "demo-skill", Session: rules.Session}); e == nil || e.Code != "NOT_FOUND" {
+		t.Fatalf("项目副本已移除，promote 应返回 NOT_FOUND，得到 %+v", e)
 	}
 }
 
