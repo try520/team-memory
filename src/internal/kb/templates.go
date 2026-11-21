@@ -128,7 +128,7 @@ func tasksTemplate(slug string) string {
 func journalIndexHeader(ym string) string {
 	return fmt.Sprintf(`# %s 会话索引
 
-| 日期 | 人 | 一句话 | 文件 |
+| 日期 | 会话标签 | 一句话 | 文件 |
 | --- | --- | --- | --- |
 `, ym)
 }

@@ -28,7 +28,7 @@ curl -s http://127.0.0.1:8080/healthz   # {"ok":true,"projects":0,...}
 ```bash
 docker build --build-arg GO_IMAGE=registry.example.com/library/golang:1.23-alpine \
              --build-arg RUNTIME_IMAGE=registry.example.com/library/alpine:3.20 \
-             -t team-memory:0.1.2 .
+             -t team-memory:0.1.3 .
 ```
 
 一个数据目录只允许一个实例：启动会在数据目录写 `.pid`，检测到存活进程直接退出。

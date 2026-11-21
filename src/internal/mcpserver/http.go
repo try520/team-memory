@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	Version         = "0.1.2"
+	Version         = "0.1.3"
 	DefaultProtocol = "2025-06-18"
 	SessionHeader   = "Mcp-Session-Id"
 	ProtocolHeader  = "MCP-Protocol-Version"

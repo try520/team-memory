@@ -457,3 +457,45 @@ func TestReadPagingKeepsRunes(t *testing.T) {
 		t.Fatalf("续读拼接与原内容不一致：原 %d 字符，读回 %d 字符", len(body), got.Len())
 	}
 }
+
+func TestJournalIndexHeaderAndLegacyCompat(t *testing.T) {
+	svc := newSvc(t)
+	rules := mustRules(t, svc, "demo")
+
+	// 新建月索引：表头用「会话标签」
+	if _, e := svc.Write("demo", WriteReq{
+		Path: "journal/2026-07/zhangsan-0930.md", Mode: "create", Session: rules.Session,
+		Content: "# 新表头\n结论。\n",
+	}); e != nil {
+		t.Fatalf("journal: %v", e)
+	}
+	body, _, err := svc.st.ReadFile("demo", "journal/2026-07.INDEX.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "| 日期 | 会话标签 | 一句话 | 文件 |") {
+		t.Fatalf("新索引表头应为「会话标签」:\n%s", body)
+	}
+
+	// 旧月索引：保留「人」表头，只追加行，不重写整表
+	legacy := "| 日期 | 人 | 一句话 | 文件 |\n| --- | --- | --- | --- |\n| 2026-06-01 | zhangsan | 旧行 | old.md |\n"
+	if e := svc.st.WriteAtomic("demo", "journal/2026-06.INDEX.md", []byte(legacy)); e != nil {
+		t.Fatalf("写旧索引: %v", e)
+	}
+	if _, e := svc.Write("demo", WriteReq{
+		Path: "journal/2026-06/lisi-1010.md", Mode: "create", Session: rules.Session,
+		Content: "# 旧表头追加\n结论。\n",
+	}); e != nil {
+		t.Fatalf("journal: %v", e)
+	}
+	old, _, err := svc.st.ReadFile("demo", "journal/2026-06.INDEX.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(old), "| 日期 | 人 | 一句话 | 文件 |") || strings.Contains(string(old), "会话标签") {
+		t.Fatalf("旧表头不应被重写:\n%s", old)
+	}
+	if !strings.Contains(string(old), "old.md") || !strings.Contains(string(old), "lisi-1010.md") {
+		t.Fatalf("旧索引应保留旧行并追加新行:\n%s", old)
+	}
+}

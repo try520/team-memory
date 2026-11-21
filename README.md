@@ -96,7 +96,7 @@ data/
 | `TASKS.md` | 项目首次访问时生成；表格行由 `memory_write` 写入 | 通过 `memory_read` 读取；`get_rules` 的文件清单里列出 | 写表格时服务端自动补「推进者（自报）」与「更新时间」，手改后同样要重新 `get_rules` 才能写 |
 | `topics/*.md` | `memory_write`（新建必须带索引行）或 `memory_import` | `memory_read` 按索引「适用场景」挑选阅读 | `replace` 前自动快照到 `.history`；直接删除会留下索引行，下次 `get_rules` 报 `missing_file` |
 | `journal/YYYY-MM/<label>-<hhmm>.md` | 模型收尾时 `memory_write` 写入 | 不在 `get_rules` 正文里，只在当月索引中出现 | 可直接删除，索引行不会自动清理；不影响主题文档 |
-| `journal/YYYY-MM.INDEX.md` | 写 journal 时由服务端自动追加一行 | `get_rules` 返回当月与上月的索引文件清单，模型按需 `memory_read` | 手改不会立刻报错，但会与日志文件不一致；没有强校验 |
+| `journal/YYYY-MM.INDEX.md` | 写 journal 时由服务端自动追加一行（列为「日期 / 会话标签 / 一句话 / 文件」） | `get_rules` 返回当月与上月的索引文件清单，模型按需 `memory_read` | 手改不会立刻报错，但会与日志文件不一致；没有强校验。已有旧文件保留原「人」表头，仅追加新行 |
 | `.history/<相对路径>/<时间>.md` | 任何 `replace` 或 `import(mode=replace)` 覆盖前自动生成 | `memory_read` 传 `rev` 读取旧版本 | 每个文件只保留最近 50 份，自动清理；删掉只丢历史，不影响当前内容 |
 | `.pid` | 启动时写入进程号（容器内为 `1`），退出时删除 | 模型用不到 | 用作单实例锁。运行中删除可能导致同一数据目录被启动第二个实例，不要删 |
 
@@ -112,7 +112,7 @@ data/
 cd src
 docker compose up -d
 curl -s http://127.0.0.1:8080/healthz
-# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.2"}
+# {"ok":true,"pid":1,"projects":0,"sessions":0,"uptime_s":5,"version":"0.1.3"}
 ```
 
 `docker-compose.yml` 默认从本目录构建镜像，并把 `./data` 挂到容器的 `/data`。镜像已公开发布、可匿名拉取，也可 `docker compose up -d --build` 本地构建。
@@ -122,7 +122,7 @@ curl -s http://127.0.0.1:8080/healthz
 ```yaml
 services:
   memory:
-    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.2
+    image: registry.cn-hangzhou.aliyuncs.com/mybase-tools/develop-memory:0.1.3
     container_name: team-memory
     restart: unless-stopped
     ports:
@@ -175,7 +175,7 @@ services:
 
 ## 编辑器扩展
 
-扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.1`、服务端 `0.1.2`（插件可连 `0.1.1+`）：
+扩展是标准 `.vsix`，VS Code 与 Trae 都可安装。当前插件 `0.1.1`、服务端 `0.1.3`（插件可连 `0.1.1+`）：
 
 ```powershell
 code --install-extension .\team-memory-<version>.vsix
